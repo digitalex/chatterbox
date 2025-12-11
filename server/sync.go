@@ -7,12 +7,52 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
+	"github.com/go-chi/chi/v5"
 )
+
+func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	roomID := chi.URLParam(r, "roomID")
+	userID := r.Header.Get("X-User-ID")
+
+	// 1. Parse Request
+	type MsgReq struct {
+		Content interface{} `json:"content"` // Any JSON (text or encrypted blob)
+	}
+	var req MsgReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Generate ID (Simple approach: Microseconds)
+	// In production, you might want a robust Snowflake ID generator.
+	msgID := time.Now().UnixMicro()
+
+	// 3. Spanner Mutation
+	m := spanner.Insert("Messages",
+		[]string{"RoomId", "MessageId", "SenderId", "Content", "CreatedAt"},
+		[]interface{}{roomID, msgID, userID, spanner.NullJSON{Value: req.Content, Valid: true}, spanner.CommitTimestamp},
+	)
+
+	_, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{m})
+	if err != nil {
+		http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Return Success
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message_id": msgID,
+		"status":     "sent",
+	})
+}
 
 func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	
-	// 1. Auth Stub: In real life, get this from a JWT middleware.
+	// 1. Auth Stub: In real life, get this drom a JWT middleware.
 	// For now, we trust the header for testing.
 	userID := r.Header.Get("X-User-ID")
 	if userID == "" {
