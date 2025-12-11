@@ -15,61 +15,44 @@ import (
 	"google.golang.org/api/iterator"
 )
 
-var spannerClient *spanner.Client
+// Server holds dependencies
+type Server struct {
+	spannerClient *spanner.Client
+	router        *chi.Mux
+}
 
 func main() {
 	ctx := context.Background()
-	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT") // e.g. "alexander-chatterbox"
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	instanceID := "chatterbox-db"
-	databaseID := os.Getenv("SPANNER_DATABASE") // e.g. "chatter-test"
+	databaseID := os.Getenv("SPANNER_DATABASE")
 
 	if projectID == "" || databaseID == "" {
-		log.Fatal("Please set GOOGLE_CLOUD_PROJECT and SPANNER_DATABASE env vars")
+		log.Fatal("Please set GOOGLE_CLOUD_PROJECT and SPANNER_DATABASE")
 	}
 
 	dbPath := fmt.Sprintf("projects/%s/instances/%s/databases/%s", projectID, instanceID, databaseID)
 
-	// 1. Connect to Spanner
-	var err error
-	spannerClient, err = spanner.NewClient(ctx, dbPath)
+	client, err := spanner.NewClient(ctx, dbPath)
 	if err != nil {
 		log.Fatalf("Failed to create Spanner client: %v", err)
 	}
-	defer spannerClient.Close()
-	log.Println("✅ Connected to Spanner at", dbPath)
+	defer client.Close()
 
-	// 2. Setup Router
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	// Initialize Server
+	srv := NewServer(client)
 	
-	// Basic CORS for development
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"}, // Change to your Firebase URL in prod
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-User-ID"},
-	}))
-
-	// 3. Define Routes
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Chatterbox API is running 🚀"))
-	})
-
-	r.Get("/health", healthCheckHandler)
-
-	// Start Server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	log.Printf("Listening on port %s", port)
-	http.ListenAndServe(":"+port, r)
+	http.ListenAndServe(":"+port, srv.router)
 }
 
-// healthCheckHandler runs a simple query to ensure DB access works
-func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	stmt := spanner.Statement{SQL: "SELECT 1"}
-	iter := spannerClient.Single().Query(r.Context(), stmt)
+	iter := s.spannerClient.Single().Query(r.Context(), stmt)
 	defer iter.Stop()
 
 	row, err := iter.Next()
@@ -92,5 +75,32 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 		"status": "ok",
 		"db_check": val,
 	})
+}
+
+// NewServer sets up routes and returns the server struct
+func NewServer(client *spanner.Client) *Server {
+	s := &Server{
+		spannerClient: client,
+		router:        chi.NewRouter(),
+	}
+	s.routes()
+	return s
+}
+
+func (s *Server) routes() {
+	s.router.Use(middleware.Logger)
+	s.router.Use(middleware.Recoverer)
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-User-ID"},
+	}))
+
+	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Chatterbox API is running 🚀"))
+	})
+
+	s.router.Get("/health", s.healthCheckHandler)
+	s.router.Post("/api/sync", s.syncHandler)
 }
 
