@@ -24,7 +24,6 @@ function App() {
     <div className="app-container">
       {/* Sidebar */}
       <aside className="sidebar">
-        <h2>Chatterbox</h2>
         <div className="room-list">
           {rooms?.map((room) => (
             <div

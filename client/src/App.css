@@ -7,8 +7,7 @@
 
 .sidebar {
   width: 250px;
-  background: #f0f2f5;
-  border-right: 1px solid #ddd;
+  background: #343434;
   padding: 1rem;
 }
 
@@ -18,8 +17,8 @@
   border-radius: 6px;
   margin-bottom: 4px;
 }
-.room-item.active { background: #e0e4e9; font-weight: bold; }
-.room-item:hover { background: #e9ecef; }
+.room-item.active { font-weight: bold; }
+.room-item:hover { background: #565656; }
 
 .chat-window {
   flex: 1;
@@ -66,7 +65,6 @@
 
 .composer {
   padding: 1rem;
-  border-top: 1px solid #ddd;
   display: flex;
   gap: 10px;
 }
