@@ -1,3 +1,6 @@
+# Misc
+.vscode/
+
 # Secrets
 gcp-key.json
 
