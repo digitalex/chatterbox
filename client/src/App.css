@@ -70,3 +70,15 @@
 }
 input { flex: 1; padding: 8px; }
 
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  background: #f8f9fa;
+  gap: 1rem;
+}
+.debug-id { font-family: monospace; color: #aaa; font-size: 0.8rem; margin-top: 2rem; }

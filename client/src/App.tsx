@@ -4,11 +4,24 @@ import { db, type Room, type Message } from './db';
 import { syncData, sendMessage } from './sync';
 import { format } from 'date-fns';
 import './App.css'; // You'll need some basic CSS
+import { Login } from './Login';
 
 function App() {
+  const [hasJoined, setHasJoined] = useState(false);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
 
-  // 1. Auto-Sync on mount and every 5 seconds
+  // 1. Check if we are already logged in on mount
+  useEffect(() => {
+    const savedName = localStorage.getItem('chatterbox_username');
+    if (savedName) setHasJoined(true);
+    
+    // Start sync immediately regardless, so data is ready
+    syncData();
+    const interval = setInterval(syncData, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 2. Auto-Sync on mount and every 5 seconds
   useEffect(() => {
     syncData(); // Initial load
     const interval = setInterval(syncData, 5000);
@@ -19,6 +32,12 @@ function App() {
   const rooms = useLiveQuery(async () => {
     return await db.rooms.toArray();
   });
+
+  // Show Login Screen if not joined
+  if (!hasJoined) {
+    return <Login onLogin={() => setHasJoined(true)} />;
+  }
+
 
   return (
     <div className="app-container">

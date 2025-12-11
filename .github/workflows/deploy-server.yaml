@@ -29,7 +29,7 @@ jobs:
           gcloud builds submit ./server \
             --tag gcr.io/chatterbox-480916/api-server \
             --gcs-source-staging-dir gs://chatterbox-builds-480916/source \
-            --gcs-log-dir gs://chatterbox-builds-480916/logs
+            
 
       # 4. Deploy to Cloud Run
       - name: Deploy
@@ -41,4 +41,3 @@ jobs:
             --allow-unauthenticated \
             --set-env-vars GOOGLE_CLOUD_PROJECT=chatterbox-480916 \
             --set-env-vars SPANNER_DATABASE=chatter-test
-

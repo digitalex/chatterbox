@@ -1,0 +1,37 @@
+name: Deploy Client
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'client/**' # Only run if frontend code changes
+      - '.github/workflows/deploy.yaml'
+
+jobs:
+  deploy-client:
+      needs: deploy-server
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+
+        # 1. Setup Node
+        - uses: actions/setup-node@v4
+          with:
+            node-version: 18
+
+        # 2. Install & Build
+        - name: Build Client
+          run: |
+            cd client
+            npm ci
+            npm run build
+
+        # 3. Deploy to Firebase
+        - uses: FirebaseExtended/action-hosting-deploy@v0
+          with:
+            repoToken: '${{ secrets.GITHUB_TOKEN }}'
+            firebaseServiceAccount: '${{ secrets.GCP_SA_KEY }}'
+            channelId: live
+            projectId: chatterbox-480916
+          env:
+            FIREBASE_CLI_PREVIEWS: none
