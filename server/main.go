@@ -21,6 +21,7 @@ type Server struct {
 	router        *chi.Mux
 }
 
+// Sets up everything
 func main() {
 	ctx := context.Background()
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
