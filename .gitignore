@@ -1,3 +1,6 @@
+# Secrets
+gcp-key.json
+
 # Logs
 logs
 *.log

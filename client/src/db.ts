@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie';
+import Dexie, { type Table } from 'dexie';
 
 // 1. Define Types (Mirroring our Go structs)
 export interface Room {
