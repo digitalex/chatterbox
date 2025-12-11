@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Room, type Message } from './db';
-import { syncData } from './sync';
+import { syncData, sendMessage } from './sync';
 import { format } from 'date-fns';
 import './App.css'; // You'll need some basic CSS
 
@@ -59,6 +59,17 @@ function ChatRoom({ roomId }: { roomId: string }) {
     [roomId]
   );
 
+  // State for the input
+  const [inputText, setInputText] = useState('');
+
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
+    
+    // Send plain text for now (we'll add encryption later)
+    await sendMessage(roomId, { text: inputText });
+    setInputText('');
+  };
+
   return (
     <div className="room-view">
       <div className="message-list">
@@ -76,8 +87,14 @@ function ChatRoom({ roomId }: { roomId: string }) {
         ))}
       </div>
       <div className="composer">
-        <input type="text" placeholder="Type a message..." disabled />
-        <button disabled>Send</button>
+        <input 
+          type="text" 
+          placeholder="Type a message..." 
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+        />
+        <button onClick={handleSend}>Send</button>
       </div>
     </div>
   );

@@ -50,3 +50,23 @@ export async function syncData() {
   }
 }
 
+export async function sendMessage(roomId: string, content: any) {
+  try {
+    const response = await fetch(`${API_URL}/rooms/${roomId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-ID': 'user-alice-123', // Still hardcoded for now
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) throw new Error('Send failed');
+    
+    // Trigger an immediate sync to pull the new message back down
+    await syncData();
+    
+  } catch (error) {
+    console.error('Send error:', error);
+  }
+}
