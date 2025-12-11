@@ -14,9 +14,6 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID := r.Header.Get("X-User-ID") // We trust the client-generated UUID
 
-	type ProfileReq struct {
-		DisplayName string `json:"display_name"`
-	}
 	var req ProfileReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
@@ -26,9 +23,9 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
 	// Upsert the user.
 	// We use a dummy email since we don't care about it anymore.
 	m := spanner.InsertOrUpdate("Users",
-		[]string{"UserId", "DisplayName", "Email", "CreatedAt"},
-		[]interface{}{userID, req.DisplayName, "anon@chatterbox.local", spanner.CommitTimestamp},
-	)
+        []string{"UserId", "DisplayName", "Email", "PublicKey", "CreatedAt"},
+        []interface{}{userID, req.DisplayName, "anon", req.PublicKey, spanner.CommitTimestamp},
+    )
 
 	_, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{m})
 	if err != nil {
@@ -37,6 +34,42 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) getRoomMembersHandler(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    roomID := chi.URLParam(r, "roomID")
+
+    stmt := spanner.Statement{
+        SQL: `SELECT u.UserId, u.PublicKey 
+              FROM RoomMembers rm
+              JOIN Users u ON rm.UserId = u.UserId
+              WHERE rm.RoomId = @rid`,
+        Params: map[string]interface{}{"rid": roomID},
+    }
+    iter := s.spannerClient.Single().Query(ctx, stmt)
+    defer iter.Stop()
+
+    var members []*RoomMember
+    for {
+        row, err := iter.Next()
+        if err == iterator.Done { break }
+        if err != nil {
+            http.Error(w, err.Error(), http.StatusInternalServerError)
+            return
+        }
+        var m RoomMember
+        // Handle Nullable PublicKey (older users might not have one)
+        var pk spanner.NullString
+        if err := row.Columns(&m.UserID, &pk); err != nil {
+            http.Error(w, "Parse Error", http.StatusInternalServerError)
+            return
+        }
+        m.PublicKey = pk.StringVal // Empty string if null
+        members = append(members, &m)
+    }
+
+    json.NewEncoder(w).Encode(members)
 }
 
 func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {

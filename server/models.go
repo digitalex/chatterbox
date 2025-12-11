@@ -32,3 +32,14 @@ type MsgResult struct {
 	CreatedAt time.Time         `json:"created_at"`
 }
 
+// Update ProfileReq
+type ProfileReq struct {
+	DisplayName string `json:"display_name"`
+	PublicKey   string `json:"public_key"` // New field
+}
+
+// Add a Response struct for the new endpoint
+type RoomMember struct {
+    UserID    string `json:"user_id"`
+    PublicKey string `json:"public_key"`
+}
