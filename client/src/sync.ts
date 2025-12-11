@@ -1,7 +1,6 @@
 import { db } from './db';
 
-//const API_URL = 'http://localhost:8080/api';
-const API_URL = 'https://chatterbox-api-799963617514.us-west1.run.app/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 const USER_ID = 'user-alice-123'; // Hardcoded for testing
 
 export async function syncData() {

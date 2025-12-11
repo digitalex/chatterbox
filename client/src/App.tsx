@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type Room, type Message } from './db';
+import { db } from './db';
 import { syncData, sendMessage } from './sync';
 import { format } from 'date-fns';
 import './App.css'; // You'll need some basic CSS
