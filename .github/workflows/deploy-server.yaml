@@ -1,0 +1,43 @@
+name: Deploy API
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'server/**' # Only run if backend code changes
+      - '.github/workflows/deploy.yaml'
+
+jobs:
+  deploy-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Login to Google Cloud
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      # 2. Setup gcloud CLI
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: 'chatterbox-480916'
+
+      # 3. Build Container (Using your dedicated build bucket)
+      - name: Build
+        run: |
+          gcloud builds submit ./server \
+            --tag gcr.io/chatterbox-480916/api-server \
+            --gcs-source-staging-dir gs://chatterbox-builds-480916/source
+
+      # 4. Deploy to Cloud Run
+      - name: Deploy
+        run: |
+          gcloud run deploy chatterbox-api \
+            --image gcr.io/chatterbox-480916/api-server \
+            --region us-west1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars GOOGLE_CLOUD_PROJECT=chatterbox-480916 \
+            --set-env-vars SPANNER_DATABASE=chatter-test
+
