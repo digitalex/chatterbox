@@ -51,6 +51,17 @@
   align-self: flex-start;
 }
 
+/* Add to App.css */
+.message-bubble.my-message {
+  align-self: flex-end;
+  background: #005c4b; /* WhatsApp Green-ish */
+  text-align: right;
+}
+
+.message-bubble.my-message .meta {
+  justify-content: flex-end;
+}
+
 .meta { font-size: 0.75rem; opacity: 0.8; margin-bottom: 4px; display: flex; gap: 8px; }
 
 .composer {
