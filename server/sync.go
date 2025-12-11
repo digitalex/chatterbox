@@ -10,6 +10,35 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := r.Header.Get("X-User-ID") // We trust the client-generated UUID
+
+	type ProfileReq struct {
+		DisplayName string `json:"display_name"`
+	}
+	var req ProfileReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Upsert the user.
+	// We use a dummy email since we don't care about it anymore.
+	m := spanner.InsertOrUpdate("Users",
+		[]string{"UserId", "DisplayName", "Email", "CreatedAt"},
+		[]interface{}{userID, req.DisplayName, "anon@chatterbox.local", spanner.CommitTimestamp},
+	)
+
+	_, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{m})
+	if err != nil {
+		http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	roomID := chi.URLParam(r, "roomID")

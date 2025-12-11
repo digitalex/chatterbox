@@ -104,5 +104,6 @@ func (s *Server) routes() {
 	s.router.Get("/health", s.healthCheckHandler)
 	s.router.Post("/api/sync", s.syncHandler)
 	s.router.Post("/api/rooms/{roomID}/messages", s.sendMessageHandler)
+	s.router.Post("/api/me", s.updateProfileHandler)
 }
 
