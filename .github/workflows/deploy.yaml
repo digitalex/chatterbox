@@ -1,10 +1,11 @@
-name: Deploy Chatterbox server and client
+name: Deploy
 
 on:
   push:
     branches: [ "main" ]
     paths:
-      - 'server/**' # Only run if backend code changes
+      - 'server/**' # run if backend code changes
+      - 'client/**' # run if client code changes
       - '.github/workflows/deploy.yaml'
 
 jobs:
