@@ -60,7 +60,7 @@ jobs:
         run: |
           cd client
           npm config set registry https://registry.npmjs.org/
-          npm install
+          npm i
           npm run build
 
       # 3. Deploy to Firebase
