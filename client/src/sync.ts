@@ -56,7 +56,7 @@ export async function sendMessage(roomId: string, content: any) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-ID': 'user-alice-123', // Still hardcoded for now
+        'X-User-ID': USER_ID,
       },
       body: JSON.stringify({ content }),
     });

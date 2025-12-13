@@ -58,6 +58,7 @@ jobs:
       - name: Build Client
         run: |
           cd client
+          npm config set registry https://registry.npmjs.org/
           npm ci
           npm run build
 
