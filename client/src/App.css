@@ -78,7 +78,7 @@ input { flex: 1; padding: 8px; }
   justify-content: center;
   height: 100vh;
   width: 100vw;
-  background: #f8f9fa;
+  background: #f8f9fb;
   gap: 1rem;
 }
 .debug-id { font-family: monospace; color: #aaa; font-size: 0.8rem; margin-top: 2rem; }
