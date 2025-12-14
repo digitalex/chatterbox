@@ -4,7 +4,7 @@ import { db } from '../db';
 
 // Mock fetch
 const fetchMock = vi.fn();
-global.fetch = fetchMock;
+vi.stubGlobal('fetch', fetchMock);
 
 describe('Sync Logic', () => {
   beforeEach(async () => {

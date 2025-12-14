@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { USER_ID, API_URL } from '../sync';
 
 // Mock fetch
 const fetchMock = vi.fn();
-global.fetch = fetchMock;
+vi.stubGlobal('fetch', fetchMock);
 
 // Test component to consume the context
 const TestComponent = () => {

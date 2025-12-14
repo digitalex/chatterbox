@@ -24,10 +24,8 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 // Mock crypto.randomUUID
-Object.defineProperty(global, 'crypto', {
-  value: {
-    randomUUID: () => 'test-uuid-1234',
-  },
+vi.stubGlobal('crypto', {
+  randomUUID: () => 'test-uuid-1234',
 });
 
 // Mock import.meta.env
