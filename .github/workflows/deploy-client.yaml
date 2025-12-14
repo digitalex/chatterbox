@@ -28,5 +28,6 @@ jobs:
           firebaseServiceAccount: '${{ secrets.GCP_SA_KEY }}'
           channelId: live
           projectId: chatterbox-480916
+          entryPoint: ./client
         env:
           FIREBASE_CLI_PREVIEWS: none
