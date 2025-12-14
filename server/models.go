@@ -6,15 +6,21 @@ import (
 	"cloud.google.com/go/spanner"
 )
 
+type UserResult struct {
+    UserID      string `json:"user_id"`
+    DisplayName string `json:"display_name"`
+}
+
 // API Request/Response shapes
 type SyncRequest struct {
 	LastSyncedAt *time.Time `json:"last_synced_at"` // Nullable for first load
 }
 
 type SyncResponse struct {
-	SyncTimestamp time.Time     `json:"sync_timestamp"`
-	Rooms         []*RoomResult `json:"rooms"`
-	Messages      []*MsgResult  `json:"messages"`
+    SyncTimestamp time.Time     `json:"sync_timestamp"`
+    Rooms         []*RoomResult `json:"rooms"`
+    Messages      []*MsgResult  `json:"messages"`
+    Users         []*UserResult `json:"users"`
 }
 
 // Data structures for JSON response

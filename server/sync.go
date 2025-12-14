@@ -221,12 +221,51 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 4. Return Response
-	resp := SyncResponse{
-		SyncTimestamp: now,
-		Rooms:         rooms,
-		Messages:      messages,
-	}
+	var users []*UserResult
+    if len(messages) > 0 {
+        // 1. Collect unique sender IDs
+        uniqueUsers := make(map[string]bool)
+        var userIDs []string
+        for _, m := range messages {
+            if !uniqueUsers[m.SenderID] {
+                uniqueUsers[m.SenderID] = true
+                userIDs = append(userIDs, m.SenderID)
+            }
+        }
+
+        // 2. Query Users table
+        stmt := spanner.Statement{
+            SQL: `SELECT UserId, DisplayName 
+                  FROM Users 
+                  WHERE UserId IN UNNEST(@uids)`,
+            Params: map[string]interface{}{"uids": userIDs},
+        }
+        userIter := s.spannerClient.Single().Query(ctx, stmt)
+        defer userIter.Stop()
+
+        for {
+            row, err := userIter.Next()
+            if err == iterator.Done { break }
+            if err != nil {
+                http.Error(w, "DB Error Users: "+err.Error(), http.StatusInternalServerError)
+                return
+            }
+            var u UserResult
+            if err := row.Columns(&u.UserID, &u.DisplayName); err != nil {
+                // If DisplayName is missing/null, handle gracefully or ignore
+                continue 
+            }
+            users = append(users, &u)
+        }
+    }
+
+    // 4. Return Response
+    resp := SyncResponse{
+        SyncTimestamp: now,
+        Rooms:         rooms,
+        Messages:      messages,
+        Users:         users,
+    }
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
