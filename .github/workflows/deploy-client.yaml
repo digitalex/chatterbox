@@ -27,7 +27,7 @@ jobs:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           firebaseServiceAccount: '${{ secrets.GCP_SA_KEY }}'
           channelId: live
-          projectId: chatterbox-99e70
+          projectId: chatterbox-480916
           entryPoint: ./client
         env:
           FIREBASE_CLI_PREVIEWS: none
