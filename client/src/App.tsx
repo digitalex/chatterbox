@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
 import { db } from './db';
-import { syncData, sendMessage, USER_ID } from './sync';
+import { syncData, sendMessage, createRoom, USER_ID } from './sync';
 import { Login } from './Login';
 import { AuthProvider, useAuth } from './AuthContext';
 import './App.css';
@@ -24,17 +24,21 @@ function ChatterboxApp() {
     const name = window.prompt("Enter a name for the new chat room:");
     if (!name) return;
 
-    const newRoomId = crypto.randomUUID(); // Native browser UUID generation
-    
-    await db.rooms.add({
-      room_id: newRoomId,
-      last_read_message_id: 0,
-      name: name,
-      created_at: new Date().toISOString(),
-    });
+    try {
+      const room = await createRoom(name);
 
-    // Automatically switch to the new room
-    setActiveRoomId(newRoomId);
+      await db.rooms.add({
+        room_id: room.room_id,
+        last_read_message_id: 0,
+        name: room.name,
+        created_at: room.created_at,
+      });
+
+      // Automatically switch to the new room
+      setActiveRoomId(room.room_id);
+    } catch (e) {
+      alert("Failed to create room");
+    }
   };
 
   // --- MOBILE LOGIC ---

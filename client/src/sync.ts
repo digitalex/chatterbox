@@ -92,3 +92,23 @@ export async function sendMessage(roomId: string, content: any) {
     console.error('Send error:', error);
   }
 }
+
+export async function createRoom(name: string) {
+  try {
+    const response = await fetch(`${API_URL}/rooms`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-User-ID': USER_ID,
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) throw new Error('Create room failed');
+
+    return await response.json();
+  } catch (error) {
+    console.error('Create room error:', error);
+    throw error;
+  }
+}
