@@ -1,55 +1,46 @@
 import { useState } from 'react';
-import { USER_ID, API_URL } from './sync';
+import { useAuth } from './AuthContext'; // Import the hook
+import './Login.css'; // We will add some styles below
 
-export function Login({ onLogin }: { onLogin: () => void }) {
-  const [username, setUsername] = useState('');
-  const [loading, setLoading] = useState(false);
+export function Login() {
+  const { login } = useAuth();
+  const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!username.trim()) return;
-    setLoading(true);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
 
-    try {
-      // 1. Tell server who we are
-      await fetch(`${API_URL}/me`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-ID': USER_ID,
-        },
-        body: JSON.stringify({ display_name: username }),
-      });
-
-      // 2. Save locally so we remember next time
-      localStorage.setItem('chatterbox_username', username);
-      
-      // 3. Notify parent app
-      onLogin();
-    } catch (err) {
-      console.error(err);
-      alert('Failed to login. Check console.');
-    } finally {
-      setLoading(false);
-    }
+    setIsSubmitting(true);
+    await login(name);
+    // No need to setSubmitting(false) or redirect, 
+    // the AuthContext state change will trigger App to unmount this component.
   };
 
   return (
-    <div className="login-container">
-      <h1>Welcome to Chatterbox</h1>
-      <p>Pick a username to start chatting anonymously.</p>
-      
-      <input 
-        type="text" 
-        placeholder="e.g. Maverick" 
-        value={username}
-        onChange={e => setUsername(e.target.value)}
-        disabled={loading}
-      />
-      <button onClick={handleSubmit} disabled={loading || !username}>
-        {loading ? 'Joining...' : 'Join Chat'}
-      </button>
-
-      <div className="debug-id">Your ID: {USER_ID}</div>
+    <div className="login-wrapper">
+      <div className="login-card">
+        <h1>👋 Welcome</h1>
+        <p>Choose a display name to join the conversation.</p>
+        
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Your Name (e.g. Alex)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={isSubmitting}
+            autoFocus
+          />
+          <button type="submit" disabled={isSubmitting || !name.trim()}>
+            {isSubmitting ? 'Joining...' : 'Continue'}
+          </button>
+        </form>
+        
+        <div className="login-footer">
+           You will remain anonymous. No password required.
+        </div>
+      </div>
     </div>
   );
 }

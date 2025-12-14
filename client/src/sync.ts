@@ -1,8 +1,23 @@
 import { db } from './db';
 
-//const API_URL = 'http://localhost:8080/api';
-export const API_URL = 'https://chatterbox-api-799963617514.us-west1.run.app/api';
-export const USER_ID = 'user-alice-123'; // Hardcoded for testing
+// 1. DYNAMIC API URL
+// Uses the variable from .env.production or .env.local. 
+// Fallback to localhost if missing.
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+
+// 2. DYNAMIC USER ID
+// Check if we already have an identity in this browser
+const STORAGE_KEY = 'chatterbox_user_id';
+let storedId = localStorage.getItem(STORAGE_KEY);
+
+if (!storedId) {
+  // If not, generate a new random UUID
+  storedId = crypto.randomUUID();
+  localStorage.setItem(STORAGE_KEY, storedId);
+}
+
+// Export the persistent ID (e.g. "a1b2-c3d4-...")
+export const USER_ID = storedId;
 
 export async function syncData() {
   try {
@@ -15,7 +30,7 @@ export async function syncData() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-ID': USER_ID,
+        'X-User-ID': USER_ID, // <--- Sends the REAL dynamic ID now
       },
       body: JSON.stringify({ last_synced_at: lastSyncedAt }),
     });
@@ -43,7 +58,9 @@ export async function syncData() {
       }
     });
 
-    console.log(`✅ Synced. ${data.messages?.length || 0} new msgs.`);
+    if (data.messages?.length > 0) {
+        console.log(`✅ Synced. ${data.messages.length} new msgs.`);
+    }
     
   } catch (error) {
     console.error('Sync error:', error);
@@ -56,7 +73,7 @@ export async function sendMessage(roomId: string, content: any) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-ID': USER_ID,
+        'X-User-ID': USER_ID, // <--- Sends the REAL dynamic ID now
       },
       body: JSON.stringify({ content }),
     });
