@@ -11,29 +11,36 @@ import (
 )
 
 func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	userID := r.Header.Get("X-User-ID") // We trust the client-generated UUID
+    ctx := r.Context()
+    userID := r.Header.Get("X-User-ID")
 
-	var req ProfileReq
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
-	}
+    var req ProfileReq
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
 
-	// Upsert the user.
-	// We use a dummy email since we don't care about it anymore.
-	m := spanner.InsertOrUpdate("Users",
+    // 1. Create the User Mutation
+    userMutation := spanner.InsertOrUpdate("Users",
         []string{"UserId", "DisplayName", "Email", "PublicKey", "CreatedAt"},
         []interface{}{userID, req.DisplayName, "anon", req.PublicKey, spanner.CommitTimestamp},
     )
 
-	_, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{m})
-	if err != nil {
-		http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+    // 2. Create the Room Membership Mutation (Auto-Join General)
+    // We use InsertOrUpdate so it doesn't crash if they are already a member.
+    roomMutation := spanner.InsertOrUpdate("RoomMembers",
+        []string{"RoomId", "UserId", "JoinedAt", "LastReadMessageId"},
+        []interface{}{"room-general-001", userID, spanner.CommitTimestamp, 0},
+    )
 
-	w.WriteHeader(http.StatusOK)
+    // 3. Apply BOTH mutations in one transaction
+    _, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{userMutation, roomMutation})
+    if err != nil {
+        http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) getRoomMembersHandler(w http.ResponseWriter, r *http.Request) {

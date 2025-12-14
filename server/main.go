@@ -91,11 +91,16 @@ func NewServer(client *spanner.Client) *Server {
 func (s *Server) routes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
-	s.router.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-User-ID"},
-	}))
+    s.router.Use(cors.Handler(cors.Options{
+        AllowedOrigins: []string{
+            "http://localhost:5173",          // Local Development
+            "https://chatterbox-480916.web.app", // Your Production Frontend
+            "https://chatterbox-480916.firebaseapp.com",
+        },
+        AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+        AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-User-ID"},
+        AllowCredentials: true,
+    }))
 
 	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Chatterbox API is running 🚀"))
