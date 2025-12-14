@@ -1,0 +1,51 @@
+name: Deploy Server
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'server/**' # Only trigger if server code changes
+      - '.github/workflows/deploy-server.yaml'
+
+jobs:
+  verify-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+      - name: Verify Build
+        run: |
+          cd server
+          go build -v ./...
+
+  deploy-server:
+    needs: verify-server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: 'chatterbox-480916'
+
+      - name: Build & Submit Image
+        run: |
+          gcloud builds submit ./server \
+            --tag gcr.io/chatterbox-480916/api-server \
+            --gcs-source-staging-dir gs://chatterbox-builds-480916/source \
+            --gcs-log-dir gs://chatterbox-builds-480916/logs
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy chatterbox-api \
+            --image gcr.io/chatterbox-480916/api-server \
+            --region us-west1 \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars GOOGLE_CLOUD_PROJECT=chatterbox-480916 \
+            --set-env-vars SPANNER_DATABASE=chatter-test
