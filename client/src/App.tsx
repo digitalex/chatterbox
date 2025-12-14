@@ -20,6 +20,23 @@ function ChatterboxApp() {
 
   const rooms = useLiveQuery(async () => await db.rooms.toArray());
 
+  const handleCreateRoom = async () => {
+    const name = window.prompt("Enter a name for the new chat room:");
+    if (!name) return;
+
+    const newRoomId = crypto.randomUUID(); // Native browser UUID generation
+    
+    await db.rooms.add({
+      room_id: newRoomId,
+      last_read_message_id: 0,
+      name: name,
+      created_at: new Date().toISOString(),
+    });
+
+    // Automatically switch to the new room
+    setActiveRoomId(newRoomId);
+  };
+
   // --- MOBILE LOGIC ---
   // If a room is active, add the class to hide the sidebar on mobile
   const sidebarClass = activeRoomId ? 'sidebar hidden-on-mobile' : 'sidebar';
@@ -35,6 +52,9 @@ function ChatterboxApp() {
            <h2>Chatterbox</h2>
            <span className="user-badge">{user.name}</span>
         </div>
+        <button onClick={handleCreateRoom} className="new-room-btn">
+          + New room
+        </button>
         <div className="room-list">
           {rooms?.map((room) => (
             <div

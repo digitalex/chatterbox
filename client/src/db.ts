@@ -5,6 +5,7 @@ export interface Room {
   room_id: string;
   name: string;
   last_read_message_id: number; // Server's view of our read status
+  created_at: string;           // ISO String
   unread_count?: number;        // Calculated locally
 }
 
