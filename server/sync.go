@@ -6,9 +6,59 @@ import (
 	"time"
 
 	"cloud.google.com/go/spanner"
-	"google.golang.org/api/iterator"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"google.golang.org/api/iterator"
 )
+
+func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID := r.Header.Get("X-User-ID")
+
+	type RoomReq struct {
+		Name string `json:"name"`
+	}
+	var req RoomReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "Room name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Generate a UUID for the room
+	roomID := uuid.New().String()
+
+	// 1. Create the Room Mutation
+	roomMutation := spanner.Insert("Rooms",
+		[]string{"RoomId", "Name", "CreatedAt"},
+		[]interface{}{roomID, req.Name, spanner.CommitTimestamp},
+	)
+
+	// 2. Create the Room Membership Mutation
+	memberMutation := spanner.Insert("RoomMembers",
+		[]string{"RoomId", "UserId", "JoinedAt", "LastReadMessageId"},
+		[]interface{}{roomID, userID, spanner.CommitTimestamp, 0},
+	)
+
+	// 3. Apply BOTH mutations in one transaction
+	_, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{roomMutation, memberMutation})
+	if err != nil {
+		http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Return Success
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"room_id":    roomID,
+		"name":       req.Name,
+		"created_at": time.Now(), // Approximate, actual time is commit timestamp
+	})
+}
 
 func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
