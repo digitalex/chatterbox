@@ -4,15 +4,14 @@ import { format } from 'date-fns';
 import { db } from './db';
 import { syncData, sendMessage, USER_ID } from './sync';
 import { Login } from './Login';
-import { AuthProvider, useAuth } from './AuthContext'; // Import new context
+import { AuthProvider, useAuth } from './AuthContext';
 import './App.css';
 
-// 1. We wrap the real app logic in a sub-component so it can use the hook
+// 1. Main Component
 function ChatterboxApp() {
   const { user, isLoading } = useAuth();
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
 
-  // Sync Logic (Run this regardless of login state to keep DB fresh, or optionally only after login)
   useEffect(() => {
     syncData();
     const interval = setInterval(syncData, 5000);
@@ -21,16 +20,17 @@ function ChatterboxApp() {
 
   const rooms = useLiveQuery(async () => await db.rooms.toArray());
 
-  // Show loading spinner while checking LocalStorage
-  if (isLoading) return <div className="loading-screen">Loading...</div>;
+  // --- MOBILE LOGIC ---
+  // If a room is active, add the class to hide the sidebar on mobile
+  const sidebarClass = activeRoomId ? 'sidebar hidden-on-mobile' : 'sidebar';
 
-  // Show Login if not authenticated
+  if (isLoading) return <div className="loading-screen">Loading...</div>;
   if (!user) return <Login />;
 
-  // --- Main Chat UI ---
   return (
     <div className="app-container">
-      <aside className="sidebar">
+      {/* Apply the dynamic class here */}
+      <aside className={sidebarClass}>
         <div className="sidebar-header">
            <h2>Chatterbox</h2>
            <span className="user-badge">{user.name}</span>
@@ -50,7 +50,11 @@ function ChatterboxApp() {
 
       <main className="chat-window">
         {activeRoomId ? (
-          <ChatRoom roomId={activeRoomId} />
+          <ChatRoom 
+            roomId={activeRoomId} 
+            // Pass the handler to clear the active room (showing the sidebar again)
+            onBack={() => setActiveRoomId(null)} 
+          />
         ) : (
           <div className="empty-state">Select a room to start chatting</div>
         )}
@@ -59,7 +63,7 @@ function ChatterboxApp() {
   );
 }
 
-// 2. The Main Export wraps everything in the Provider
+// 2. Export Wrapper
 export default function App() {
   return (
     <AuthProvider>
@@ -68,20 +72,20 @@ export default function App() {
   );
 }
 
-// ... (ChatRoom component stays EXACTLY the same as before) ...
-function ChatRoom({ roomId }: { roomId: string }) {
-    // ... Copy your existing ChatRoom code here ...
-    // Note: You can replace localStorage.getItem('chatterbox_user_id') 
-    // with the `USER_ID` import from './sync' for consistency.
+// 3. ChatRoom Component
+interface ChatRoomProps {
+  roomId: string;
+  onBack: () => void;
+}
+
+function ChatRoom({ roomId, onBack }: ChatRoomProps) {
     const messages = useLiveQuery(
       () => db.messages.where('room_id').equals(roomId).sortBy('created_at'),
       [roomId]
     );
 
-    // Fetch User Directory (as a Map for easy lookup)
     const userMap = useLiveQuery(async () => {
       const users = await db.users.toArray();
-      // Create a Map: "user-123" => "Alice"
       return new Map(users.map(u => [u.user_id, u.display_name]));
     });
 
@@ -93,9 +97,19 @@ function ChatRoom({ roomId }: { roomId: string }) {
       setInputText('');
       await sendMessage(roomId, { text: textToSend });
     };
+
+    const roomName = useLiveQuery(() => db.rooms.get(roomId))?.name || 'Chat';
   
     return (
       <div className="room-view">
+        <div className="chat-header">
+          {/* This button is hidden on desktop by CSS, shown on mobile */}
+          <button className="back-button" onClick={onBack}>
+            &#8592; {/* Left Arrow Character */}
+          </button>
+          <span className="chat-title">#{roomName}</span>
+        </div>
+        
         <div className="message-list">
           {messages?.map((msg) => (
             <div key={msg.message_id} className={`message-bubble ${msg.sender_id === USER_ID ? 'my-message' : ''}`}>
@@ -106,14 +120,15 @@ function ChatRoom({ roomId }: { roomId: string }) {
                 <span className="time">{format(new Date(msg.created_at), 'HH:mm')}</span>
               </div>
               <div className="body">
-                {(msg.content && typeof msg.content === 'object' && msg.content.text) 
-                  ? msg.content.text 
+                {(msg.content && typeof msg.content === 'object' && 'text' in msg.content) 
+                  ? (msg.content as any).text 
                   : JSON.stringify(msg.content)
                 }
               </div>
             </div>
           ))}
         </div>
+
         <div className="composer">
           <input 
             type="text" 
@@ -128,4 +143,4 @@ function ChatRoom({ roomId }: { roomId: string }) {
         </div>
       </div>
     );
-  }
+}
