@@ -77,7 +77,14 @@ function ChatRoom({ roomId }: { roomId: string }) {
       () => db.messages.where('room_id').equals(roomId).sortBy('created_at'),
       [roomId]
     );
-    
+
+    // Fetch User Directory (as a Map for easy lookup)
+    const userMap = useLiveQuery(async () => {
+      const users = await db.users.toArray();
+      // Create a Map: "user-123" => "Alice"
+      return new Map(users.map(u => [u.user_id, u.display_name]));
+    });
+
     const [inputText, setInputText] = useState('');
   
     const handleSend = async () => {
@@ -93,7 +100,9 @@ function ChatRoom({ roomId }: { roomId: string }) {
           {messages?.map((msg) => (
             <div key={msg.message_id} className={`message-bubble ${msg.sender_id === USER_ID ? 'my-message' : ''}`}>
               <div className="meta">
-                <span className="author">{msg.sender_id}</span>
+                <span className="author">
+                  {userMap?.get(msg.sender_id) || msg.sender_id}
+                </span>
                 <span className="time">{format(new Date(msg.created_at), 'HH:mm')}</span>
               </div>
               <div className="body">

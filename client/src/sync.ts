@@ -40,7 +40,7 @@ export async function syncData() {
     const data = await response.json();
 
     // 3. Write to IndexedDB (Transactional)
-    await db.transaction('rw', db.rooms, db.messages, db.config, async () => {
+    await db.transaction('rw', db.rooms, db.messages, db.config, db.users, async () => {
       
       // A. Update Rooms
       if (data.rooms) {
@@ -52,7 +52,12 @@ export async function syncData() {
         await db.messages.bulkPut(data.messages);
       }
 
-      // C. Update Sync Timestamp
+      // C. Update Users (New Logic)
+      if (data.users) {
+        await db.users.bulkPut(data.users);
+      }
+
+      // D. Update Sync Timestamp
       if (data.sync_timestamp) {
         await db.config.put({ key: 'last_synced_at', value: data.sync_timestamp });
       }

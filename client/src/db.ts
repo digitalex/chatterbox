@@ -16,6 +16,11 @@ export interface Message {
   created_at: string; // ISO String
 }
 
+export interface User {
+  user_id: string;
+  display_name: string;
+}
+
 export interface UserConfig {
   key: string;
   value: any;
@@ -26,15 +31,17 @@ class ChatDatabase extends Dexie {
   rooms!: Table<Room>;
   messages!: Table<Message>;
   config!: Table<UserConfig>;
+  users!: Table<User>;
 
   constructor() {
     super('ChatterboxDB');
     
     // Define indexes (Schema)
-    this.version(1).stores({
-      rooms: 'room_id', // Primary Key
-      messages: '[room_id+message_id], room_id, created_at', // Compound PK & Indexes
-      config: 'key' // For storing "last_synced_at"
+    this.version(2).stores({
+      rooms: 'room_id',
+      messages: '[room_id+message_id], room_id, created_at',
+      config: 'key',
+      users: 'user_id'
     });
   }
 }
