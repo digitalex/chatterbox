@@ -11,7 +11,7 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: google-labs-code/jules-invoke@v1
+      - uses: google-labs-code/jules-invoke@main
         with:
           prompt: |
             Read the file server/openapi.json to see the latest API documentation. Make sure that there are unit tests for every part of the API specification. If any of the tests fail, fix the code - the api doc should always be the authoritative source.
