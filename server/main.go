@@ -92,9 +92,14 @@ func (s *Server) routes() {
 	})
 
 	s.router.Get("/health", s.healthCheckHandler)
-	s.router.Post("/api/sync", s.syncHandler)
-	s.router.Post("/api/rooms", s.createRoomHandler)
-	s.router.Post("/api/rooms/{roomID}/messages", s.sendMessageHandler)
-	s.router.Post("/api/me", s.updateProfileHandler)
-	s.router.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
+	s.router.Post("/api/login", s.loginHandler)
+
+	s.router.Group(func(r chi.Router) {
+		r.Use(JWTMiddleware)
+		r.Post("/api/sync", s.syncHandler)
+		r.Post("/api/rooms", s.createRoomHandler)
+		r.Post("/api/rooms/{roomID}/messages", s.sendMessageHandler)
+		r.Post("/api/me", s.updateProfileHandler)
+		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
+	})
 }
