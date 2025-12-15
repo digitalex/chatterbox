@@ -1,0 +1,426 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Chatterbox API",
+    "description": "Backend API for the Chatterbox chat application.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local Development Server"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Root Check",
+        "description": "Simple check to see if the API is running.",
+        "responses": {
+          "200": {
+            "description": "API is running message",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "Chatterbox API is running 🚀"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Checks the health of the service and the database connection.",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "db_check": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/sync": {
+      "post": {
+        "summary": "Sync Data",
+        "description": "Syncs rooms, messages, and users for the authenticated user.",
+        "security": [
+          {
+            "X-User-ID": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Missing X-User-ID header"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/rooms": {
+      "post": {
+        "summary": "Create Room",
+        "description": "Creates a new chat room.",
+        "security": [
+          {
+            "X-User-ID": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the room"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Room created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "room_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid JSON or missing name"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/rooms/{roomID}/messages": {
+      "post": {
+        "summary": "Send Message",
+        "description": "Sends a message to a specific room.",
+        "security": [
+          {
+            "X-User-ID": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "roomID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the room"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "description": "Any JSON content (text or encrypted blob)",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message_id": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "sent"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid JSON"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "post": {
+        "summary": "Update Profile",
+        "description": "Updates the user's profile information.",
+        "security": [
+          {
+            "X-User-ID": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileReq"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully"
+          },
+          "400": {
+            "description": "Bad Request - Invalid JSON"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/rooms/{roomID}/members": {
+      "get": {
+        "summary": "Get Room Members",
+        "description": "Retrieves the list of members in a specific room.",
+        "parameters": [
+          {
+            "name": "roomID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "ID of the room"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of room members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoomMember"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SyncRequest": {
+        "type": "object",
+        "properties": {
+          "last_synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the last sync. Null for first load."
+          }
+        }
+      },
+      "SyncResponse": {
+        "type": "object",
+        "properties": {
+          "sync_timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoomResult"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MsgResult"
+            }
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserResult"
+            }
+          }
+        }
+      },
+      "RoomResult": {
+        "type": "object",
+        "properties": {
+          "room_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "last_read_message_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "ID of the last message read by the user in this room."
+          }
+        }
+      },
+      "MsgResult": {
+        "type": "object",
+        "properties": {
+          "room_id": {
+            "type": "string"
+          },
+          "message_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sender_id": {
+            "type": "string"
+          },
+          "content": {
+            "description": "The message content (JSON)",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserResult": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileReq": {
+        "type": "object",
+        "required": [
+          "display_name",
+          "public_key"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          }
+        }
+      },
+      "RoomMember": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "X-User-ID": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-User-ID",
+        "description": "Custom header to identify the user."
+      }
+    }
+  }
+}
