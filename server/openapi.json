@@ -9,6 +9,10 @@
     {
       "url": "http://localhost:8080",
       "description": "Local Development Server"
+    },
+    {
+      "url": "https://chatterbox-api-799963617514.us-west1.run.app/api"
+      "description": "Live test server"
     }
   ],
   "paths": {
