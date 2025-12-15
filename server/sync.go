@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -44,8 +45,37 @@ func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
 		[]interface{}{roomID, userID, spanner.CommitTimestamp, 0},
 	)
 
-	// 3. Apply BOTH mutations in one transaction
-	_, err := s.spannerClient.Apply(ctx, []*spanner.Mutation{roomMutation, memberMutation})
+	// 3. Apply mutations in one transaction
+	// We use ReadWriteTransaction to ensure the user exists before adding them to the room.
+	_, err := s.spannerClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		// A. Check if user exists
+		stmt := spanner.Statement{
+			SQL:    "SELECT 1 FROM Users WHERE UserId = @uid",
+			Params: map[string]interface{}{"uid": userID},
+		}
+		iter := txn.Query(ctx, stmt)
+		_, err := iter.Next()
+		iter.Stop() // Release resources
+
+		var mutations []*spanner.Mutation
+
+		// If user not found (err == iterator.Done), create a stub user
+		if err == iterator.Done {
+			userMutation := spanner.Insert("Users",
+				[]string{"UserId", "DisplayName", "Email", "PublicKey", "CreatedAt"},
+				[]interface{}{userID, "Anonymous", "anon", "", spanner.CommitTimestamp},
+			)
+			mutations = append(mutations, userMutation)
+		} else if err != nil {
+			return err
+		}
+
+		// B. Add Room and Member mutations
+		mutations = append(mutations, roomMutation, memberMutation)
+
+		return txn.BufferWrite(mutations)
+	})
+
 	if err != nil {
 		http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
 		return
