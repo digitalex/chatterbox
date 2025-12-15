@@ -5,6 +5,7 @@ import { db } from './db';
 import { syncData, sendMessage, createRoom, USER_ID } from './sync';
 import { Login } from './Login';
 import { AuthProvider, useAuth } from './AuthContext';
+import { CreateRoomModal } from './CreateRoomModal';
 import './App.css';
 
 // --- ICONS (Inline SVGs) ---
@@ -34,6 +35,7 @@ const CheckIcon = () => (
 function ChatterboxApp() {
   const { user, isLoading } = useAuth();
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [isNewRoomModalOpen, setIsNewRoomModalOpen] = useState(false);
 
   useEffect(() => {
     syncData();
@@ -43,22 +45,15 @@ function ChatterboxApp() {
 
   const rooms = useLiveQuery(async () => await db.rooms.toArray());
 
-  const handleCreateRoom = async () => {
-    const name = window.prompt("Enter a name for the new chat room:");
-    if (!name) return;
-
-    try {
-      const room = await createRoom(name);
-      await db.rooms.add({
-        room_id: room.room_id,
-        last_read_message_id: 0,
-        name: room.name,
-        created_at: room.created_at,
-      });
-      setActiveRoomId(room.room_id);
-    } catch (e) {
-      alert("Failed to create room");
-    }
+  const handleCreateRoom = async (name: string) => {
+    const room = await createRoom(name);
+    await db.rooms.add({
+      room_id: room.room_id,
+      last_read_message_id: 0,
+      name: room.name,
+      created_at: room.created_at,
+    });
+    setActiveRoomId(room.room_id);
   };
 
   const sidebarClass = activeRoomId ? 'sidebar hidden-on-mobile' : 'sidebar';
@@ -68,10 +63,17 @@ function ChatterboxApp() {
 
   return (
     <div className="app-container">
+      {isNewRoomModalOpen && (
+        <CreateRoomModal
+          existingNames={rooms?.map((r) => r.name) || []}
+          onClose={() => setIsNewRoomModalOpen(false)}
+          onCreate={handleCreateRoom}
+        />
+      )}
       <aside className={sidebarClass}>
         <div className="sidebar-header">
            <h1>Lobby</h1>
-           <button onClick={handleCreateRoom} className="new-room-btn">
+           <button onClick={() => setIsNewRoomModalOpen(true)} className="new-room-btn">
              <PlusIcon />
            </button>
         </div>
