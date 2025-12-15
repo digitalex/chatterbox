@@ -7,6 +7,29 @@ import { Login } from './Login';
 import { AuthProvider, useAuth } from './AuthContext';
 import './App.css';
 
+// --- ICONS (Inline SVGs) ---
+const PlusIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+);
+const ChevronRightIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+);
+const BackIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+);
+const InfoIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="10" /><path stroke="white" strokeWidth="2" d="M12 16v-4M12 8h.01" /></svg>
+);
+const SmileyIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+);
+const SendIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+);
+const CheckIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+);
+
 // 1. Main Component
 function ChatterboxApp() {
   const { user, isLoading } = useAuth();
@@ -26,23 +49,18 @@ function ChatterboxApp() {
 
     try {
       const room = await createRoom(name);
-
       await db.rooms.add({
         room_id: room.room_id,
         last_read_message_id: 0,
         name: room.name,
         created_at: room.created_at,
       });
-
-      // Automatically switch to the new room
       setActiveRoomId(room.room_id);
     } catch (e) {
       alert("Failed to create room");
     }
   };
 
-  // --- MOBILE LOGIC ---
-  // If a room is active, add the class to hide the sidebar on mobile
   const sidebarClass = activeRoomId ? 'sidebar hidden-on-mobile' : 'sidebar';
 
   if (isLoading) return <div className="loading-screen">Loading...</div>;
@@ -50,23 +68,37 @@ function ChatterboxApp() {
 
   return (
     <div className="app-container">
-      {/* Apply the dynamic class here */}
       <aside className={sidebarClass}>
         <div className="sidebar-header">
-           <h2>Chatterbox</h2>
-           <span className="user-badge">{user.name}</span>
+           <h1>Lobby</h1>
+           <button onClick={handleCreateRoom} className="new-room-btn">
+             <PlusIcon />
+           </button>
         </div>
-        <button onClick={handleCreateRoom} className="new-room-btn">
-          + New room
-        </button>
+
+        <div className="sidebar-subheader">
+          <span>YOUR ROOMS</span>
+          <a href="#" className="see-all">See all</a>
+        </div>
+
         <div className="room-list">
           {rooms?.map((room) => (
             <div
               key={room.room_id}
-              className={`room-item ${activeRoomId === room.room_id ? 'active' : ''}`}
+              className={`room-card ${activeRoomId === room.room_id ? 'active' : ''}`}
               onClick={() => setActiveRoomId(room.room_id)}
             >
-              #{room.name}
+              <div className="room-status-indicator"></div>
+              <div className="room-info">
+                <div className="room-name-row">
+                  <span className="room-name">{room.name}</span>
+                </div>
+                <div className="room-members">3 members</div>
+              </div>
+              <div className="room-meta">
+                <span className="room-time">10m</span>
+                <ChevronRightIcon />
+              </div>
             </div>
           ))}
         </div>
@@ -76,7 +108,6 @@ function ChatterboxApp() {
         {activeRoomId ? (
           <ChatRoom 
             roomId={activeRoomId} 
-            // Pass the handler to clear the active room (showing the sidebar again)
             onBack={() => setActiveRoomId(null)} 
           />
         ) : (
@@ -127,43 +158,67 @@ function ChatRoom({ roomId, onBack }: ChatRoomProps) {
     return (
       <div className="room-view">
         <div className="chat-header">
-          {/* This button is hidden on desktop by CSS, shown on mobile */}
           <button className="back-button" onClick={onBack}>
-            &#8592; {/* Left Arrow Character */}
+            <BackIcon />
           </button>
-          <span className="chat-title">#{roomName}</span>
+          <div className="chat-header-info">
+            <span className="chat-title">{roomName}</span>
+            <span className="chat-status"><span className="status-dot"></span> Active now</span>
+          </div>
+          <button className="info-button">
+            <InfoIcon />
+          </button>
         </div>
         
         <div className="message-list">
-          {messages?.map((msg) => (
-            <div key={msg.message_id} className={`message-bubble ${msg.sender_id === USER_ID ? 'my-message' : ''}`}>
-              <div className="meta">
-                <span className="author">
-                  {userMap?.get(msg.sender_id) || msg.sender_id}
-                </span>
-                <span className="time">{format(new Date(msg.created_at), 'HH:mm')}</span>
+          <div className="date-separator"><span>Today</span></div>
+          {messages?.map((msg) => {
+            const isMe = msg.sender_id === USER_ID;
+            return (
+              <div key={msg.message_id} className={`message-row ${isMe ? 'outgoing' : 'incoming'}`}>
+                {!isMe && <div className="avatar">{userMap?.get(msg.sender_id)?.charAt(0) || '?'}</div>}
+
+                <div className="message-content">
+                  {!isMe && <span className="author-name">{userMap?.get(msg.sender_id) || msg.sender_id}</span>}
+
+                  <div className="message-bubble">
+                    <div className="body">
+                      {(msg.content && typeof msg.content === 'object' && 'text' in msg.content)
+                        ? (msg.content as any).text
+                        : JSON.stringify(msg.content)
+                      }
+                    </div>
+                  </div>
+
+                  <div className="message-time">
+                    {format(new Date(msg.created_at), 'hh:mm a')}
+                    {isMe && <span className="read-receipt"><CheckIcon /></span>}
+                  </div>
+                </div>
               </div>
-              <div className="body">
-                {(msg.content && typeof msg.content === 'object' && 'text' in msg.content) 
-                  ? (msg.content as any).text 
-                  : JSON.stringify(msg.content)
-                }
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <div className="composer">
-          <input 
-            type="text" 
-            placeholder="Type a message..." 
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSend();
-            }}
-          />
-          <button onClick={handleSend} disabled={!inputText.trim()}>Send</button>
+        <div className="composer-container">
+          <button className="composer-btn plus-btn">
+             <PlusIcon />
+          </button>
+          <div className="input-wrapper">
+             <input
+              type="text"
+              placeholder="Type a message..."
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSend();
+              }}
+            />
+            <button className="smiley-btn"><SmileyIcon /></button>
+          </div>
+          <button className="send-btn" onClick={handleSend} disabled={!inputText.trim()}>
+            <SendIcon />
+          </button>
         </div>
       </div>
     );
