@@ -1,6 +1,7 @@
 -- 1. Users Table
 CREATE TABLE Users (
     UserId STRING(36) NOT NULL,
+    DisplayName STRING(255),
     Email STRING(255) NOT NULL,
     PublicKey STRING(MAX),
     CreatedAt TIMESTAMP NOT NULL OPTIONS (allow_commit_timestamp=true)
@@ -35,4 +36,3 @@ CREATE TABLE Messages (
 
 -- 5. Global Index for Sync
 CREATE INDEX MessagesByTime ON Messages(CreatedAt) STORING (SenderId, Content);
-
