@@ -12,13 +12,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"google.golang.org/api/iterator"
 )
 
 // Server holds dependencies
 type Server struct {
-	spannerClient *spanner.Client
-	router        *chi.Mux
+	db     Database
+	router *chi.Mux
 }
 
 // Sets up everything
@@ -40,8 +39,8 @@ func main() {
 	}
 	defer client.Close()
 
-	// Initialize Server
-	srv := NewServer(client)
+	// Initialize Server with SpannerDB
+	srv := NewServer(&SpannerDB{client: client})
 	
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -52,37 +51,23 @@ func main() {
 }
 
 func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	stmt := spanner.Statement{SQL: "SELECT 1"}
-	iter := s.spannerClient.Single().Query(r.Context(), stmt)
-	defer iter.Stop()
-
-	row, err := iter.Next()
-	if err == iterator.Done {
-		http.Error(w, "No results", http.StatusInternalServerError)
-		return
-	}
+	val, err := s.db.HealthCheck(r.Context())
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Spanner Error: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	var val int64
-	if err := row.Column(0, &val); err != nil {
-		http.Error(w, "Parse Error", http.StatusInternalServerError)
-		return
-	}
-
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "ok",
+		"status":   "ok",
 		"db_check": val,
 	})
 }
 
 // NewServer sets up routes and returns the server struct
-func NewServer(client *spanner.Client) *Server {
+func NewServer(db Database) *Server {
 	s := &Server{
-		spannerClient: client,
-		router:        chi.NewRouter(),
+		db:     db,
+		router: chi.NewRouter(),
 	}
 	s.routes()
 	return s
@@ -91,16 +76,16 @@ func NewServer(client *spanner.Client) *Server {
 func (s *Server) routes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
-    s.router.Use(cors.Handler(cors.Options{
-        AllowedOrigins: []string{
-            "http://localhost:5173",          // Local Development
-            "https://chatterbox-480916.web.app", // Your Production Frontend
-            "https://chatterbox-480916.firebaseapp.com",
-        },
-        AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
-        AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-User-ID"},
-        AllowCredentials: true,
-    }))
+	s.router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{
+			"http://localhost:5173",             // Local Development
+			"https://chatterbox-480916.web.app", // Your Production Frontend
+			"https://chatterbox-480916.firebaseapp.com",
+		},
+		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-User-ID"},
+		AllowCredentials: true,
+	}))
 
 	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Chatterbox API is running 🚀"))
@@ -113,4 +98,3 @@ func (s *Server) routes() {
 	s.router.Post("/api/me", s.updateProfileHandler)
 	s.router.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
 }
-
