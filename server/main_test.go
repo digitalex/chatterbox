@@ -76,7 +76,8 @@ func TestSync(t *testing.T) {
 
 	reqBody := `{"last_synced_at": "2023-01-01T00:00:00Z"}`
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(rr, req)
@@ -109,7 +110,8 @@ func TestCreateRoom(t *testing.T) {
 
 	reqBody := `{"name": "New Room"}`
 	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(reqBody))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(rr, req)
@@ -144,7 +146,8 @@ func TestSendMessage(t *testing.T) {
 
 	reqBody := `{"content": "hello"}`
 	req, _ := http.NewRequest("POST", "/api/rooms/room-1/messages", strings.NewReader(reqBody))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	rr := httptest.NewRecorder()
 
@@ -169,7 +172,8 @@ func TestUpdateProfile(t *testing.T) {
 
 	reqBody := `{"display_name": "New Name", "public_key": "key123"}`
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(rr, req)
@@ -192,6 +196,8 @@ func TestGetRoomMembers(t *testing.T) {
 	srv := NewServer(mockDB)
 
 	req, _ := http.NewRequest("GET", "/api/rooms/room-1/members", nil)
+	token, _ := GenerateToken("u1")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(rr, req)

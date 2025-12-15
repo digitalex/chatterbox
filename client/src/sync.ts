@@ -19,6 +19,27 @@ if (!storedId) {
 // Export the persistent ID (e.g. "a1b2-c3d4-...")
 export const USER_ID = storedId;
 
+// Token Cache
+let authToken: string | null = null;
+
+export async function getAuthToken(): Promise<string> {
+  if (authToken) return authToken;
+
+  const response = await fetch(`${API_URL}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: USER_ID }),
+  });
+
+  if (!response.ok) {
+      throw new Error('Login failed');
+  }
+
+  const data = await response.json();
+  authToken = data.token;
+  return authToken!;
+}
+
 export async function syncData() {
   try {
     // 1. Get last sync timestamp from local DB
@@ -26,14 +47,21 @@ export async function syncData() {
     const lastSyncedAt = config?.value || null;
 
     // 2. Call Server
+    const token = await getAuthToken();
     const response = await fetch(`${API_URL}/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-ID': USER_ID, // <--- Sends the REAL dynamic ID now
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ last_synced_at: lastSyncedAt }),
     });
+
+    if (response.status === 401) {
+      authToken = null; // Token might be expired
+      // Retry logic could be added here
+      throw new Error('Unauthorized');
+    }
 
     if (!response.ok) throw new Error('Sync failed');
 
@@ -74,14 +102,20 @@ export async function syncData() {
 
 export async function sendMessage(roomId: string, content: any) {
   try {
+    const token = await getAuthToken();
     const response = await fetch(`${API_URL}/rooms/${roomId}/messages`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-ID': USER_ID, // <--- Sends the REAL dynamic ID now
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ content }),
     });
+
+    if (response.status === 401) {
+        authToken = null;
+        throw new Error('Unauthorized');
+    }
 
     if (!response.ok) throw new Error('Send failed');
     
@@ -95,14 +129,20 @@ export async function sendMessage(roomId: string, content: any) {
 
 export async function createRoom(name: string) {
   try {
+    const token = await getAuthToken();
     const response = await fetch(`${API_URL}/rooms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-ID': USER_ID,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ name }),
     });
+
+    if (response.status === 401) {
+        authToken = null;
+        throw new Error('Unauthorized');
+    }
 
     if (!response.ok) throw new Error('Create room failed');
 

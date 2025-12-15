@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { USER_ID, API_URL } from './sync';
+import { USER_ID, API_URL, getAuthToken } from './sync';
 
 // Define what our "User" looks like
 interface User {
@@ -32,9 +32,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 2. Login Function
   const login = async (name: string) => {
     // Save to server (so other users see the name)
+    const token = await getAuthToken();
     await fetch(`${API_URL}/me`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-ID': USER_ID },
+      headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ display_name: name }),
     });
 
