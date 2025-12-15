@@ -13,6 +13,13 @@ jobs:
     steps:
       - uses: google-labs-code/jules-invoke@main
         with:
-          prompt: |
-            Read the file server/openapi.json to see the latest API documentation. Make sure that there are unit tests for every part of the API specification. If any of the tests fail, fix the code - the api doc should always be the authoritative source.
+          prompt: >
+            Read the file server/openapi.json to see the latest API documentation, and server/main.go to see the implemented routes.
+            The goal is to ensure the implementation and the docs match; do these steps in sequence:
+
+            1. If there are undocumented methods in the API implementation, add them to openapi.json.
+            2. If the documentation and the implementation conflict, ask me what to do.
+            3. Make sure that there are unit tests for every part of the API specification.
+            4. If any of the tests fail, fix the code - the api doc should always be the authoritative source.
           jules_api_key: ${{ secrets.JULES_API_KEY }}
+          include_last_commit: true
