@@ -144,6 +144,9 @@ func TestCreateRoom(t *testing.T) {
 	if _, ok := resp["room_id"]; !ok {
 		t.Error("Expected room_id in response")
 	}
+	if _, ok := resp["created_at"]; !ok {
+		t.Error("Expected created_at in response")
+	}
 }
 
 func TestCreateRoomBadRequest(t *testing.T) {
@@ -183,6 +186,17 @@ func TestSendMessage(t *testing.T) {
 	if status := rr.Code; status != http.StatusCreated {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusCreated)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	if _, ok := resp["message_id"]; !ok {
+		t.Error("Expected message_id in response")
+	}
+	if status, ok := resp["status"].(string); !ok || status != "sent" {
+		t.Errorf("Expected status 'sent', got %v", resp["status"])
 	}
 }
 
@@ -236,6 +250,32 @@ func TestUpdateProfileBadRequest(t *testing.T) {
 	if status := rr.Code; status != http.StatusBadRequest {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateProfileMissingFields(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+
+	// Test missing display_name
+	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"public_key": "key123"}`))
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("Expected 400 for missing display_name, got %v", status)
+	}
+
+	// Test missing public_key
+	req, _ = http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "Name"}`))
+	token, _ = GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr = httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("Expected 400 for missing public_key, got %v", status)
 	}
 }
 
