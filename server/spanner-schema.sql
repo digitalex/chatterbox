@@ -4,7 +4,19 @@ CREATE TABLE Rooms (
   CreatedAt TIMESTAMP NOT NULL OPTIONS (
     allow_commit_timestamp = true
   ),
+  OwnerId STRING(36),
 ) PRIMARY KEY(RoomId);
+
+CREATE TABLE Invites (
+  RoomId STRING(36) NOT NULL,
+  InviteCode STRING(20) NOT NULL,
+  CreatedBy STRING(36) NOT NULL,
+  ExpiresAt TIMESTAMP NOT NULL,
+  IsUsed BOOL DEFAULT (FALSE),
+) PRIMARY KEY(RoomId, InviteCode),
+  INTERLEAVE IN PARENT Rooms ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX InvitesByCode ON Invites(InviteCode);
 
 CREATE TABLE Messages (
   RoomId STRING(36) NOT NULL,
@@ -38,5 +50,7 @@ CREATE TABLE Users (
   ),
   DisplayName STRING(100),
 ) PRIMARY KEY(UserId);
+
+ALTER TABLE Rooms ADD CONSTRAINT FK_RoomOwner FOREIGN KEY(OwnerId) REFERENCES Users(UserId);
 
 ALTER TABLE RoomMembers ADD CONSTRAINT FK_User FOREIGN KEY(UserId) REFERENCES Users(UserId);
