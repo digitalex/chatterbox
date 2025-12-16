@@ -14,7 +14,7 @@ import (
 )
 
 func TestRootEndpoint(t *testing.T) {
-	srv := NewServer(&MockDB{})
+	srv := NewServer(&MockDB{}, nil)
 
 	req, _ := http.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
@@ -39,7 +39,7 @@ func TestHealthCheck(t *testing.T) {
 			return 1, nil
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 
 	req, _ := http.NewRequest("GET", "/health", nil)
 	rr := httptest.NewRecorder()
@@ -73,7 +73,7 @@ func TestSync(t *testing.T) {
 				nil
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 
 	reqBody := `{"last_synced_at": "2023-01-01T00:00:00Z"}`
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
@@ -99,7 +99,7 @@ func TestSync(t *testing.T) {
 }
 
 func TestSyncUnauthorized(t *testing.T) {
-	srv := NewServer(&MockDB{})
+	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{}`))
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
@@ -119,7 +119,7 @@ func TestCreateRoom(t *testing.T) {
 			return nil
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 
 	reqBody := `{"name": "New Room"}`
 	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(reqBody))
@@ -147,9 +147,10 @@ func TestCreateRoom(t *testing.T) {
 }
 
 func TestCreateRoomBadRequest(t *testing.T) {
-	srv := NewServer(&MockDB{})
+	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(`{"name":`)) // Invalid JSON
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -168,7 +169,7 @@ func TestSendMessage(t *testing.T) {
 			return nil
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 
 	reqBody := `{"content": "hello"}`
 	req, _ := http.NewRequest("POST", "/api/rooms/room-1/messages", strings.NewReader(reqBody))
@@ -186,9 +187,10 @@ func TestSendMessage(t *testing.T) {
 }
 
 func TestSendMessageBadRequest(t *testing.T) {
-	srv := NewServer(&MockDB{})
+	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/rooms/room-1/messages", strings.NewReader(`{"content":`)) // Invalid JSON
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -207,7 +209,7 @@ func TestUpdateProfile(t *testing.T) {
 			return nil
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 
 	reqBody := `{"display_name": "New Name", "public_key": "key123"}`
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
@@ -224,9 +226,10 @@ func TestUpdateProfile(t *testing.T) {
 }
 
 func TestUpdateProfileBadRequest(t *testing.T) {
-	srv := NewServer(&MockDB{})
+	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name":`)) // Invalid JSON
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -245,7 +248,7 @@ func TestGetRoomMembers(t *testing.T) {
 			return []*RoomMember{{UserID: "u1", PublicKey: "key1"}}, nil
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 
 	req, _ := http.NewRequest("GET", "/api/rooms/room-1/members", nil)
 	token, _ := GenerateToken("u1")
@@ -296,9 +299,10 @@ func TestJSONMarshaling(t *testing.T) {
 }
 
 func TestCreateRoomMissingName(t *testing.T) {
-	srv := NewServer(&MockDB{})
+	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(`{}`))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -315,7 +319,7 @@ func TestHealthCheckError(t *testing.T) {
 			return 0, fmt.Errorf("DB error")
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("GET", "/health", nil)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
@@ -332,9 +336,10 @@ func TestSyncError(t *testing.T) {
 			return nil, nil, nil, fmt.Errorf("DB error")
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{}`))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -350,9 +355,10 @@ func TestCreateRoomError(t *testing.T) {
 			return fmt.Errorf("DB error")
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(`{"name": "error room"}`))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -368,9 +374,10 @@ func TestSendMessageError(t *testing.T) {
 			return fmt.Errorf("DB error")
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/rooms/r1/messages", strings.NewReader(`{"content": "error"}`))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -386,9 +393,10 @@ func TestUpdateProfileError(t *testing.T) {
 			return fmt.Errorf("DB error")
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "error", "public_key": "error"}`))
-	req.Header.Set("X-User-ID", "test-user")
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
@@ -404,8 +412,10 @@ func TestGetRoomMembersError(t *testing.T) {
 			return nil, fmt.Errorf("DB error")
 		},
 	}
-	srv := NewServer(mockDB)
+	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("GET", "/api/rooms/r1/members", nil)
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 

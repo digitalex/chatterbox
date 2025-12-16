@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 
+	"cloud.google.com/go/logging"
 	"cloud.google.com/go/spanner"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,6 +21,7 @@ import (
 type Server struct {
 	db     Database
 	router *chi.Mux
+	logger *logging.Client
 }
 
 // Sets up everything
@@ -39,9 +43,16 @@ func main() {
 	}
 	defer client.Close()
 
+	// Create logging client
+	logClient, err := logging.NewClient(ctx, projectID)
+	if err != nil {
+		log.Fatalf("Failed to create logging client: %v", err)
+	}
+	defer logClient.Close()
+
 	// Initialize Server with SpannerDB
-	srv := NewServer(&SpannerDB{client: client})
-	
+	srv := NewServer(&SpannerDB{client: client}, logClient)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -64,10 +75,11 @@ func (s *Server) healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewServer sets up routes and returns the server struct
-func NewServer(db Database) *Server {
+func NewServer(db Database, logger *logging.Client) *Server {
 	s := &Server{
 		db:     db,
 		router: chi.NewRouter(),
+		logger: logger,
 	}
 	s.routes()
 	return s
@@ -76,6 +88,7 @@ func NewServer(db Database) *Server {
 func (s *Server) routes() {
 	s.router.Use(middleware.Logger)
 	s.router.Use(middleware.Recoverer)
+	s.router.Use(s.cloudLoggingMiddleware)
 	s.router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
 			"http://localhost:5173",             // Local Development
@@ -101,5 +114,40 @@ func (s *Server) routes() {
 		r.Post("/api/rooms/{roomID}/messages", s.sendMessageHandler)
 		r.Post("/api/me", s.updateProfileHandler)
 		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
+	})
+}
+
+func (s *Server) cloudLoggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Read body
+		var bodyBytes []byte
+		if r.Body != nil {
+			// Limit request body read to 1MB to prevent DoS
+			bodyBytes, _ = io.ReadAll(io.LimitReader(r.Body, 1024*1024))
+			r.Body.Close()
+			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		}
+
+		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
+		next.ServeHTTP(ww, r)
+
+		if ww.Status() >= 400 {
+			// Log to Cloud Logging
+			if s.logger != nil {
+				// We log asynchronously to avoid blocking the response?
+				// But client library handles batching.
+				s.logger.Logger("error-log").Log(logging.Entry{
+					Payload: map[string]interface{}{
+						"method":  r.Method,
+						"url":     r.URL.String(),
+						"headers": r.Header,
+						"body":    string(bodyBytes),
+						"status":  ww.Status(),
+					},
+					Severity: logging.Error,
+				})
+			}
+		}
 	})
 }
