@@ -63,6 +63,13 @@ describe('AuthContext', () => {
   });
 
   it('should login successfully', async () => {
+    // 1. Mock Login (getAuthToken)
+    fetchMock.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: 'mock-token' }),
+    });
+
+    // 2. Mock /me call
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({}),
@@ -77,9 +84,20 @@ describe('AuthContext', () => {
     const loginButton = await screen.findByText('Login');
     await userEvent.click(loginButton);
 
-    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/me`, {
+    // Verify /login called
+    expect(fetchMock).toHaveBeenNthCalledWith(1, `${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: USER_ID }),
+    });
+
+    // Verify /me called
+    expect(fetchMock).toHaveBeenNthCalledWith(2, `${API_URL}/me`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-User-ID': USER_ID },
+      headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer mock-token'
+      },
       body: JSON.stringify({ display_name: 'Test User' }),
     });
 

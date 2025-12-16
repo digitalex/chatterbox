@@ -11,7 +11,11 @@ import (
 
 func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID := r.Header.Get("X-User-ID")
+	userID, ok := UserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	type RoomReq struct {
 		Name string `json:"name"`
@@ -47,7 +51,11 @@ func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
-    userID := r.Header.Get("X-User-ID")
+    userID, ok := UserIDFromContext(ctx)
+    if !ok {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
 
     var req ProfileReq
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -89,7 +97,11 @@ func (s *Server) getRoomMembersHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	roomID := chi.URLParam(r, "roomID")
-	userID := r.Header.Get("X-User-ID")
+	userID, ok := UserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	// 1. Parse Request
 	type MsgReq struct {
@@ -120,10 +132,10 @@ func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	
-	userID := r.Header.Get("X-User-ID")
-	if userID == "" {
-		http.Error(w, "Missing X-User-ID header", http.StatusUnauthorized)
+
+	userID, ok := UserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
