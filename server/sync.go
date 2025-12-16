@@ -55,6 +55,15 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+	if req.DisplayName == "" {
+		http.Error(w, "display_name is required", http.StatusBadRequest)
+		return
+	}
+	if req.PublicKey == "" {
+		http.Error(w, "public_key is required", http.StatusBadRequest)
+		return
+	}
+
     err := s.db.UpdateProfile(ctx, userID, req.DisplayName, req.PublicKey)
     if err != nil {
         http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)

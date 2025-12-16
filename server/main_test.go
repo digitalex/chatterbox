@@ -180,6 +180,38 @@ func TestUpdateProfile(t *testing.T) {
 	}
 }
 
+func TestUpdateProfile_MissingDisplayName(t *testing.T) {
+	srv := NewServer(&MockDB{})
+
+	reqBody := `{"public_key": "key123"}` // Missing display_name
+	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
+	req.Header.Set("X-User-ID", "test-user")
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code for missing display_name: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
+func TestUpdateProfile_MissingPublicKey(t *testing.T) {
+	srv := NewServer(&MockDB{})
+
+	reqBody := `{"display_name": "test-user"}` // Missing public_key
+	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
+	req.Header.Set("X-User-ID", "test-user")
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code for missing public_key: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
 func TestGetRoomMembers(t *testing.T) {
 	mockDB := &MockDB{
 		GetRoomMembersFn: func(ctx context.Context, roomID string) ([]*RoomMember, error) {
