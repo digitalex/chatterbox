@@ -11,11 +11,7 @@ import (
 
 func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	userID, ok := UserIDFromContext(ctx)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := r.Header.Get("X-User-ID")
 
 	type RoomReq struct {
 		Name string `json:"name"`
@@ -51,11 +47,7 @@ func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
     ctx := r.Context()
-    userID, ok := UserIDFromContext(ctx)
-    if !ok {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+    userID := r.Header.Get("X-User-ID")
 
     var req ProfileReq
     if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -65,10 +57,6 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 	if req.DisplayName == "" {
 		http.Error(w, "display_name is required", http.StatusBadRequest)
-		return
-	}
-	if req.PublicKey == "" {
-		http.Error(w, "public_key is required", http.StatusBadRequest)
 		return
 	}
 
@@ -97,11 +85,7 @@ func (s *Server) getRoomMembersHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	roomID := chi.URLParam(r, "roomID")
-	userID, ok := UserIDFromContext(ctx)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
+	userID := r.Header.Get("X-User-ID")
 
 	// 1. Parse Request
 	type MsgReq struct {
@@ -133,9 +117,9 @@ func (s *Server) sendMessageHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, ok := UserIDFromContext(ctx)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	userID := r.Header.Get("X-User-ID")
+	if userID == "" {
+		http.Error(w, "Missing X-User-ID header", http.StatusUnauthorized)
 		return
 	}
 
