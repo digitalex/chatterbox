@@ -114,6 +114,8 @@ func (s *Server) routes() {
 		r.Post("/api/rooms/{roomID}/messages", s.sendMessageHandler)
 		r.Post("/api/me", s.updateProfileHandler)
 		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
+        r.Post("/api/rooms/{roomID}/invites", s.generateInviteHandler)
+        r.Post("/api/invites/{inviteCode}/accept", s.acceptInviteHandler)
 	})
 }
 

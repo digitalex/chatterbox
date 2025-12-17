@@ -51,6 +51,21 @@ type RoomMember struct {
     PublicKey string `json:"public_key"`
 }
 
+// Invite related structs
+type InviteRequest struct {
+    ExpiresInSeconds int64 `json:"expires_in_seconds"` // Optional duration in seconds
+}
+
+type InviteResponse struct {
+    InviteCode string    `json:"invite_code"`
+    ExpiresAt  time.Time `json:"expires_at"`
+}
+
+type AcceptInviteResponse struct {
+    RoomID   string `json:"room_id"`
+    RoomName string `json:"room_name"`
+}
+
 // Database interface abstracts the data store interactions
 type Database interface {
 	HealthCheck(ctx context.Context) (int64, error)
@@ -59,4 +74,9 @@ type Database interface {
 	GetRoomMembers(ctx context.Context, roomID string) ([]*RoomMember, error)
 	SendMessage(ctx context.Context, roomID string, userID string, msgID int64, content interface{}) error
 	Sync(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error)
+
+    // New methods for invites
+    IsRoomOwner(ctx context.Context, roomID string, userID string) (bool, error)
+    GenerateInvite(ctx context.Context, roomID string, inviteCode string, createdBy string, expiresAt time.Time) error
+    AcceptInvite(ctx context.Context, inviteCode string, userID string) (string, error)
 }

@@ -299,6 +299,99 @@
           }
         }
       }
+    },
+    "/api/rooms/{roomID}/invites": {
+        "post": {
+            "summary": "Generate Invite",
+            "description": "Generates a one-time invite code for the room. Only the room owner can do this.",
+            "security": [
+                {
+                    "X-User-ID": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "roomID",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "ID of the room"
+                }
+            ],
+            "requestBody": {
+                "required": false,
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/InviteRequest"
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "201": {
+                    "description": "Invite generated successfully",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InviteResponse"
+                            }
+                        }
+                    }
+                },
+                "403": {
+                    "description": "Forbidden - Only room owner can generate invites"
+                },
+                "500": {
+                    "description": "Internal Server Error"
+                }
+            }
+        }
+    },
+    "/api/invites/{inviteCode}/accept": {
+        "post": {
+            "summary": "Accept Invite",
+            "description": "Accepts an invite code to join a room.",
+            "security": [
+                {
+                    "X-User-ID": []
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "inviteCode",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "string"
+                    },
+                    "description": "The invite code"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Invite accepted successfully",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AcceptInviteResponse"
+                            }
+                        }
+                    }
+                },
+                "404": {
+                    "description": "Not Found - Invite code invalid"
+                },
+                "412": {
+                    "description": "Precondition Failed - Invite expired or already used"
+                },
+                "500": {
+                    "description": "Internal Server Error"
+                }
+            }
+        }
     }
   },
   "components": {
@@ -416,6 +509,39 @@
             "type": "string"
           }
         }
+      },
+      "InviteRequest": {
+          "type": "object",
+          "properties": {
+              "expires_in_seconds": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Optional duration in seconds. Defaults to 24 hours."
+              }
+          }
+      },
+      "InviteResponse": {
+          "type": "object",
+          "properties": {
+              "invite_code": {
+                  "type": "string"
+              },
+              "expires_at": {
+                  "type": "string",
+                  "format": "date-time"
+              }
+          }
+      },
+      "AcceptInviteResponse": {
+          "type": "object",
+          "properties": {
+              "room_id": {
+                  "type": "string"
+              },
+              "room_name": {
+                  "type": "string"
+              }
+          }
       }
     },
     "securitySchemes": {

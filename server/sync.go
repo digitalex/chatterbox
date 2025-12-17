@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"math/big"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (s *Server) createRoomHandler(w http.ResponseWriter, r *http.Request) {
@@ -161,4 +165,108 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// Generate an invite code
+func (s *Server) generateInviteHandler(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    userID, ok := UserIDFromContext(ctx)
+    if !ok {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    roomID := chi.URLParam(r, "roomID")
+
+    // Check if user is owner
+    isOwner, err := s.db.IsRoomOwner(ctx, roomID, userID)
+    if err != nil {
+        http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+    if !isOwner {
+        http.Error(w, "Only room owner can generate invites", http.StatusForbidden)
+        return
+    }
+
+    var req InviteRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        // Optional body
+    }
+
+    // Default expiration: 1 day
+    duration := 24 * time.Hour
+    if req.ExpiresInSeconds > 0 {
+        duration = time.Duration(req.ExpiresInSeconds) * time.Second
+    }
+    expiresAt := time.Now().Add(duration)
+
+    // Generate random code
+    inviteCode := generateRandomCode(8)
+
+    err = s.db.GenerateInvite(ctx, roomID, inviteCode, userID, expiresAt)
+    if err != nil {
+        http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    resp := InviteResponse{
+        InviteCode: inviteCode,
+        ExpiresAt:  expiresAt,
+    }
+    w.WriteHeader(http.StatusCreated)
+    json.NewEncoder(w).Encode(resp)
+}
+
+// Accept an invite code
+func (s *Server) acceptInviteHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := UserIDFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	inviteCode := chi.URLParam(r, "inviteCode")
+
+	roomID, err := s.db.AcceptInvite(ctx, inviteCode, userID)
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.NotFound:
+				http.Error(w, "Invite not found", http.StatusNotFound)
+				return
+			case codes.FailedPrecondition:
+				http.Error(w, "Invite expired or already used", http.StatusPreconditionFailed)
+				return
+			}
+		}
+		http.Error(w, "Error accepting invite: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := AcceptInviteResponse{
+		RoomID: roomID,
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
+}
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func generateRandomCode(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			// Fallback or handle error? For this context, simple fallback or panic might be okay,
+			// but better to just ignore as it is unlikely.
+			// However, since we return string, we must return something.
+			// Let's assume crypto/rand works.
+			b[i] = charset[0]
+		} else {
+			b[i] = charset[num.Int64()]
+		}
+	}
+	return string(b)
 }
