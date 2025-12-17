@@ -22,6 +22,11 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
+    if req.DisplayName == "" || req.PublicKey == "" {
+        http.Error(w, "Missing required fields", http.StatusBadRequest)
+        return
+    }
+
     err := s.db.UpdateProfile(ctx, userID, req.DisplayName, req.PublicKey)
     if err != nil {
         http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
@@ -58,6 +63,19 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// If body is empty, assume clean sync (req is zero-valued)
 	}
+
+    for _, r := range req.Rooms {
+        if r.RoomID == "" || r.Name == "" {
+            http.Error(w, "Invalid Room: missing room_id or name", http.StatusBadRequest)
+            return
+        }
+    }
+    for _, m := range req.Messages {
+        if m.RoomID == "" || m.MessageID == 0 {
+             http.Error(w, "Invalid Message: missing room_id or message_id", http.StatusBadRequest)
+             return
+        }
+    }
 
 	// Default to "beginning of time" if no timestamp provided
 	lastSync := time.Time{}

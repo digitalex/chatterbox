@@ -73,7 +73,7 @@
         "description": "Syncs rooms, messages, and users. Accepts new local data (rooms, messages) and returns updates from server.",
         "security": [
           {
-            "X-User-ID": []
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -112,7 +112,7 @@
         "description": "Updates the user's profile information.",
         "security": [
           {
-            "X-User-ID": []
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -345,11 +345,10 @@
       }
     },
     "securitySchemes": {
-      "X-User-ID": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-User-ID",
-        "description": "Custom header to identify the user."
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     }
   }
