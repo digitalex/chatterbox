@@ -67,13 +67,47 @@
         }
       }
     },
+    "/api/login": {
+      "post": {
+        "summary": "Login",
+        "description": "Logs in a user and returns a JWT token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request - Invalid JSON or missing user_id"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
     "/api/sync": {
       "post": {
         "summary": "Sync Data",
         "description": "Syncs rooms, messages, and users. Accepts new local data (rooms, messages) and returns updates from server.",
         "security": [
           {
-            "X-User-ID": []
+            "BearerAuth": []
           }
         ],
         "requestBody": {
@@ -98,7 +132,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized - Missing X-User-ID header"
+            "description": "Unauthorized - Invalid or missing token"
           },
           "500": {
             "description": "Internal Server Error"
@@ -112,7 +146,7 @@
         "description": "Updates the user's profile information.",
         "security": [
           {
-            "X-User-ID": []
+            "BearerAuth": []
           }
         ],
         "requestBody": {
@@ -142,6 +176,11 @@
       "get": {
         "summary": "Get Room Members",
         "description": "Retrieves the list of members in a specific room.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "roomID",
@@ -176,6 +215,25 @@
   },
   "components": {
     "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
       "SyncRequest": {
         "type": "object",
         "properties": {
@@ -345,6 +403,11 @@
       }
     },
     "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
       "X-User-ID": {
         "type": "apiKey",
         "in": "header",
