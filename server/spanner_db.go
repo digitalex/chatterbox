@@ -133,21 +133,7 @@ func (db *SpannerDB) Sync(ctx context.Context, userID string, lastSync time.Time
 			return txn.BufferWrite(mutations)
 		})
 		if err != nil {
-			// If insertion failed (e.g. AlreadyExists), we might want to ignore it for "local first" (idempotency)
-			// BUT, the review pointed out security risks. If we ignore AlreadyExists on rooms,
-			// we must NOT add the user to the room if they weren't already there (or check permissions).
-			// Given the current simple schema (no strict ownership/authz beyond knowing RoomID),
-			// spanner.Insert failing means "room exists".
-			// If the client retries the SAME creation, we should probably succeed without error but do nothing.
-			// However, `spanner.Insert` returns `codes.AlreadyExists`.
-			// Since we want "Sync" to be idempotent, we should catch AlreadyExists and ignore it?
-			// The reviewer said "InsertOrUpdate... effectively allows unauthorized users to join any room".
-			// If we use Insert, it fails if room exists. So unauthorized users can't overwrite.
-			// But if they just want to join? That should likely be a separate action or implicit?
-			// For "CreateRoom", it implies *new* room. So failing if it exists is correct behavior for "Create".
-			// If it's a retry of the *same* creation (same ID), we might want to tolerate it.
-			// But distinguishing retry from collision is hard without more metadata.
-			// Safest for now: return the error. Client can handle conflict.
+			// If insertion failed (e.g. AlreadyExists), return the error and let the client handle the conflict.
 			return nil, nil, nil, err
 		}
 	} else {
