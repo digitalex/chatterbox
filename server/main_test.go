@@ -66,7 +66,7 @@ func TestHealthCheck(t *testing.T) {
 
 func TestSync(t *testing.T) {
 	mockDB := &MockDB{
-		SyncFn: func(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
 			return []*RoomResult{{RoomID: "1", Name: "Test Room"}},
 				[]*MsgResult{{MessageID: 1, Content: spanner.NullJSON{Value: "hello", Valid: true}}},
 				[]*UserResult{{UserID: "u1", DisplayName: "User 1"}},
@@ -98,6 +98,37 @@ func TestSync(t *testing.T) {
 	}
 }
 
+func TestSyncUpstream(t *testing.T) {
+	mockDB := &MockDB{
+		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+			if len(rooms) != 1 || rooms[0].Name != "New Room" {
+				t.Errorf("Expected 1 room named 'New Room'")
+			}
+			if len(messages) != 1 || messages[0].Content.(string) != "Hello" {
+				t.Errorf("Expected 1 message with content 'Hello'")
+			}
+			return []*RoomResult{}, []*MsgResult{}, []*UserResult{}, nil
+		},
+	}
+	srv := NewServer(mockDB, nil)
+
+	reqBody := `{
+		"rooms": [{"room_id": "r1", "name": "New Room"}],
+		"messages": [{"room_id": "r1", "message_id": 1, "content": "Hello"}]
+	}`
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
+	token, _ := GenerateToken("test-user")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+}
+
 func TestSyncUnauthorized(t *testing.T) {
 	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{}`))
@@ -107,96 +138,6 @@ func TestSyncUnauthorized(t *testing.T) {
 	if status := rr.Code; status != http.StatusUnauthorized {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusUnauthorized)
-	}
-}
-
-func TestCreateRoom(t *testing.T) {
-	mockDB := &MockDB{
-		CreateRoomFn: func(ctx context.Context, roomID string, name string, userID string) error {
-			if name != "New Room" {
-				t.Errorf("Expected name 'New Room', got %s", name)
-			}
-			return nil
-		},
-	}
-	srv := NewServer(mockDB, nil)
-
-	reqBody := `{"name": "New Room"}`
-	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(reqBody))
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusCreated {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusCreated)
-	}
-
-	var resp map[string]interface{}
-	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("Failed to decode response: %v", err)
-	}
-	if resp["name"] != "New Room" {
-		t.Errorf("Expected name 'New Room', got %v", resp["name"])
-	}
-	if _, ok := resp["room_id"]; !ok {
-		t.Error("Expected room_id in response")
-	}
-}
-
-func TestCreateRoomBadRequest(t *testing.T) {
-	srv := NewServer(&MockDB{}, nil)
-	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(`{"name":`)) // Invalid JSON
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-	}
-}
-
-func TestSendMessage(t *testing.T) {
-	mockDB := &MockDB{
-		SendMessageFn: func(ctx context.Context, roomID string, userID string, msgID int64, content interface{}) error {
-			if roomID != "room-1" {
-				t.Errorf("Expected roomID 'room-1', got %s", roomID)
-			}
-			return nil
-		},
-	}
-	srv := NewServer(mockDB, nil)
-
-	reqBody := `{"content": "hello"}`
-	req, _ := http.NewRequest("POST", "/api/rooms/room-1/messages", strings.NewReader(reqBody))
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	rr := httptest.NewRecorder()
-
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusCreated {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusCreated)
-	}
-}
-
-func TestSendMessageBadRequest(t *testing.T) {
-	srv := NewServer(&MockDB{}, nil)
-	req, _ := http.NewRequest("POST", "/api/rooms/room-1/messages", strings.NewReader(`{"content":`)) // Invalid JSON
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
 	}
 }
 
@@ -298,20 +239,6 @@ func TestJSONMarshaling(t *testing.T) {
 	}
 }
 
-func TestCreateRoomMissingName(t *testing.T) {
-	srv := NewServer(&MockDB{}, nil)
-	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(`{}`))
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusBadRequest {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusBadRequest)
-	}
-}
-
 // Test 500 errors
 func TestHealthCheckError(t *testing.T) {
 	mockDB := &MockDB{
@@ -332,50 +259,12 @@ func TestHealthCheckError(t *testing.T) {
 
 func TestSyncError(t *testing.T) {
 	mockDB := &MockDB{
-		SyncFn: func(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
 			return nil, nil, nil, fmt.Errorf("DB error")
 		},
 	}
 	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{}`))
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusInternalServerError {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusInternalServerError)
-	}
-}
-
-func TestCreateRoomError(t *testing.T) {
-	mockDB := &MockDB{
-		CreateRoomFn: func(ctx context.Context, roomID, name, userID string) error {
-			return fmt.Errorf("DB error")
-		},
-	}
-	srv := NewServer(mockDB, nil)
-	req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(`{"name": "error room"}`))
-	token, _ := GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusInternalServerError {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusInternalServerError)
-	}
-}
-
-func TestSendMessageError(t *testing.T) {
-	mockDB := &MockDB{
-		SendMessageFn: func(ctx context.Context, roomID, userID string, msgID int64, content interface{}) error {
-			return fmt.Errorf("DB error")
-		},
-	}
-	srv := NewServer(mockDB, nil)
-	req, _ := http.NewRequest("POST", "/api/rooms/r1/messages", strings.NewReader(`{"content": "error"}`))
 	token, _ := GenerateToken("test-user")
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
