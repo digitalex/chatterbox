@@ -49,8 +49,14 @@ CREATE TABLE Users (
     allow_commit_timestamp = true
   ),
   DisplayName STRING(100),
+  IsAdmin BOOL,
+  Username STRING(64),
+  PasswordHash BYTES(MAX),
+  Salt BYTES(32),
 ) PRIMARY KEY(UserId);
 
 ALTER TABLE Rooms ADD CONSTRAINT FK_RoomOwner FOREIGN KEY(OwnerId) REFERENCES Users(UserId);
 
 ALTER TABLE RoomMembers ADD CONSTRAINT FK_User FOREIGN KEY(UserId) REFERENCES Users(UserId);
+
+CREATE UNIQUE INDEX UsersByUsername ON Users(Username);
