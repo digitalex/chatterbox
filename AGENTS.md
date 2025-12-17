@@ -77,18 +77,18 @@ Used for **Permissions & Discovery** (Joining, Inviting).
 5. Client immediately triggers **Sync Loop** to fetch the room content.
 
 
-
 ---
 
-## Authorization Model
+## Coding style
 
-* **Authentication:** JWT containing `sub` (UserId) and `name`.
-* **Room Access:** Validated by checking the `RoomMembers` table.
-* **Invite Logic:**
-* Only `Room.OwnerId` can generate invites.
-* Invites are one-time use and expire (checked via Spanner Transaction).
+* Comments - use sparingly. Comments should never be about the "what", but it can sometimes be helpful to explain the "why". In general aim for clear, readable code over comments.
+* Nesting - limit nesting by using early returns and factoring out helper methods.
+* Organization - aim for separation of concerns; high cohesion, low coupling.
+* State:
+  - Prefer immutable objects when practical. They are generally easier to reason about and test than mutable, stateful code.
+  - Any object or database table holding state should be designed to make illegal states impossible and __unrepresentable__.
 
-
+---
 
 ## Common Tasks & Rules for Agents
 
