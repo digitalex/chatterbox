@@ -6,6 +6,8 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 type SpannerDB struct {
@@ -34,8 +36,8 @@ func (db *SpannerDB) HealthCheck(ctx context.Context) (int64, error) {
 
 func (db *SpannerDB) CreateRoom(ctx context.Context, roomID string, name string, userID string) error {
 	roomMutation := spanner.Insert("Rooms",
-		[]string{"RoomId", "Name", "CreatedAt"},
-		[]interface{}{roomID, name, spanner.CommitTimestamp},
+		[]string{"RoomId", "Name", "CreatedAt", "OwnerId"},
+		[]interface{}{roomID, name, spanner.CommitTimestamp, userID},
 	)
 
 	memberMutation := spanner.Insert("RoomMembers",
@@ -227,4 +229,120 @@ func (db *SpannerDB) Sync(ctx context.Context, userID string, lastSync time.Time
 	}
 
 	return rooms, messages, users, nil
+}
+
+// IsRoomOwner checks if the user is the owner of the room
+func (db *SpannerDB) IsRoomOwner(ctx context.Context, roomID string, userID string) (bool, error) {
+    stmt := spanner.Statement{
+        SQL: "SELECT OwnerId FROM Rooms WHERE RoomId = @roomID",
+        Params: map[string]interface{}{"roomID": roomID},
+    }
+    iter := db.client.Single().Query(ctx, stmt)
+    defer iter.Stop()
+
+    row, err := iter.Next()
+    if err == iterator.Done {
+        return false, nil // Room not found
+    }
+    if err != nil {
+        return false, err
+    }
+
+    var ownerID spanner.NullString
+    if err := row.Column(0, &ownerID); err != nil {
+        return false, err
+    }
+
+    return ownerID.Valid && ownerID.StringVal == userID, nil
+}
+
+// GenerateInvite creates a new invite code for a room
+func (db *SpannerDB) GenerateInvite(ctx context.Context, roomID string, inviteCode string, createdBy string, expiresAt time.Time) error {
+    m := spanner.Insert("Invites",
+        []string{"RoomId", "InviteCode", "CreatedBy", "ExpiresAt", "IsUsed"},
+        []interface{}{roomID, inviteCode, createdBy, expiresAt, false},
+    )
+    _, err := db.client.Apply(ctx, []*spanner.Mutation{m})
+    return err
+}
+
+// AcceptInvite uses an invite code to join a room
+func (db *SpannerDB) AcceptInvite(ctx context.Context, inviteCode string, userID string) (string, error) {
+    var roomID string
+
+    // Using ReadWriteTransaction to ensure atomicity
+    _, err := db.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+        // 1. Find the invite
+        stmt := spanner.Statement{
+            SQL: `SELECT RoomId, ExpiresAt, IsUsed
+                  FROM Invites
+                  WHERE InviteCode = @code`,
+            Params: map[string]interface{}{"code": inviteCode},
+        }
+        iter := txn.Query(ctx, stmt)
+        defer iter.Stop()
+
+        row, err := iter.Next()
+        if err == iterator.Done {
+            return status.Errorf(codes.NotFound, "invite not found")
+        }
+        if err != nil {
+            return err
+        }
+
+        var expiresAt time.Time
+        var isUsed bool
+        if err := row.Columns(&roomID, &expiresAt, &isUsed); err != nil {
+            return err
+        }
+
+        // 2. Validation
+        if isUsed {
+            return status.Errorf(codes.FailedPrecondition, "invite already used")
+        }
+        if time.Now().After(expiresAt) {
+            return status.Errorf(codes.FailedPrecondition, "invite expired")
+        }
+
+        // 3. Mark invite as used
+        inviteMutation := spanner.Update("Invites",
+            []string{"RoomId", "InviteCode", "IsUsed"},
+            []interface{}{roomID, inviteCode, true},
+        )
+
+        // 4. Add user to room
+        memberMutation := spanner.InsertOrUpdate("RoomMembers",
+            []string{"RoomId", "UserId", "JoinedAt", "LastReadMessageId"},
+            []interface{}{roomID, userID, spanner.CommitTimestamp, 0},
+        )
+
+        // Ensure user exists
+        userCheckStmt := spanner.Statement{
+			SQL:    "SELECT 1 FROM Users WHERE UserId = @uid",
+			Params: map[string]interface{}{"uid": userID},
+		}
+		userIter := txn.Query(ctx, userCheckStmt)
+		_, userErr := userIter.Next()
+		userIter.Stop()
+
+		var mutations []*spanner.Mutation
+
+		if userErr == iterator.Done {
+			userMutation := spanner.Insert("Users",
+				[]string{"UserId", "DisplayName", "Email", "PublicKey", "CreatedAt"},
+				[]interface{}{userID, "Anonymous", "anon", "", spanner.CommitTimestamp},
+			)
+			mutations = append(mutations, userMutation)
+		} else if userErr != nil {
+			return userErr
+		}
+
+        mutations = append(mutations, inviteMutation, memberMutation)
+        return txn.BufferWrite(mutations)
+    })
+
+    if err != nil {
+        return "", err
+    }
+    return roomID, nil
 }
