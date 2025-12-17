@@ -27,15 +27,17 @@ const userIDKey contextKey = "userID"
 
 // Claims struct
 type Claims struct {
-	UserID string `json:"user_id"`
+	UserID  string `json:"user_id"`
+	IsAdmin bool   `json:"is_admin"`
 	jwt.RegisteredClaims
 }
 
 // GenerateToken creates a new JWT for a user
-func GenerateToken(userID string) (string, error) {
+func GenerateToken(userID string, isAdmin bool) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
-		UserID: userID,
+		UserID:  userID,
+		IsAdmin: isAdmin,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -78,9 +80,12 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
+		ctx = context.WithValue(ctx, isAdminKey, claims.IsAdmin)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+const isAdminKey contextKey = "isAdmin"
 
 // UserIDFromContext retrieves the user ID from the context
 func UserIDFromContext(ctx context.Context) (string, bool) {
@@ -88,9 +93,16 @@ func UserIDFromContext(ctx context.Context) (string, bool) {
 	return userID, ok
 }
 
+// IsAdminFromContext retrieves the admin status from the context
+func IsAdminFromContext(ctx context.Context) bool {
+	isAdmin, ok := ctx.Value(isAdminKey).(bool)
+	return ok && isAdmin
+}
+
 // LoginRequest defines the body for login
 type LoginRequest struct {
-	UserID string `json:"user_id"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // LoginResponse defines the body for login response
@@ -106,12 +118,18 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.UserID == "" {
-		http.Error(w, "User ID is required", http.StatusBadRequest)
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "Username and Password are required", http.StatusBadRequest)
 		return
 	}
 
-	token, err := GenerateToken(req.UserID)
+	userID, isAdmin, err := s.db.AuthenticateUser(r.Context(), req.Username, req.Password)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := GenerateToken(userID, isAdmin)
 	if err != nil {
 		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
 		return
@@ -119,4 +137,69 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(LoginResponse{Token: token})
+}
+
+func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
+	if !IsAdminFromContext(r.Context()) {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req CreateUserReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := s.db.CreateUser(r.Context(), req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to create user: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"user_id": userID})
+}
+
+func (s *Server) changePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := UserIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req ChangePasswordReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if req.NewPassword == "" {
+		http.Error(w, "New password is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.OldPassword != "" {
+		if err := s.db.VerifyPassword(r.Context(), userID, req.OldPassword); err != nil {
+			http.Error(w, "Invalid old password", http.StatusUnauthorized)
+			return
+		}
+	} else {
+		// Enforce old password check
+		http.Error(w, "Old password is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.db.UpdatePassword(r.Context(), userID, req.NewPassword); err != nil {
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
 }

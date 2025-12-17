@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"time"
 
 	"cloud.google.com/go/spanner"
+	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -12,6 +15,144 @@ import (
 
 type SpannerDB struct {
 	client *spanner.Client
+}
+
+// Auth methods
+
+func (db *SpannerDB) AuthenticateUser(ctx context.Context, username, password string) (string, bool, error) {
+	stmt := spanner.Statement{
+		SQL: `SELECT UserId, PasswordHash, Salt, IsAdmin FROM Users WHERE Username = @username`,
+		Params: map[string]interface{}{
+			"username": username,
+		},
+	}
+	iter := db.client.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	row, err := iter.Next()
+	if err == iterator.Done {
+		return "", false, status.Error(codes.Unauthenticated, "invalid credentials")
+	}
+	if err != nil {
+		return "", false, err
+	}
+
+	var userID string
+	var passwordHash []byte
+	var salt []byte
+	var isAdmin spanner.NullBool
+
+	if err := row.Columns(&userID, &passwordHash, &salt, &isAdmin); err != nil {
+		return "", false, err
+	}
+
+	// Verify password
+	// Currently we are just using bcrypt directly.
+	// If we were using the Salt, we would append it.
+	// But bcrypt handles salt internally if we just use GenerateFromPassword.
+	// However, the DB schema has a Salt column.
+	// If we use standard bcrypt, we don't need to manage salt manually.
+	// But the user said "I have already updated the database's Users table to have PasswordHash and Salt fields".
+	// Maybe they want us to use the salt?
+	// Standard bcrypt stores salt in the hash string.
+	// If the schema requires Salt, maybe we should use it?
+	// Let's assume standard bcrypt usage (GenerateFromPassword) which includes salt in the hash.
+	// The Salt column might be extra or intended for something else, OR
+	// maybe we should append salt to password before hashing?
+	// "We should use bcrypt for the secure hashing."
+	// Let's use the Salt column to add entropy.
+	// passwordToHash = password + salt
+
+	// However, usually bcrypt generates its own salt.
+	// If I follow the instruction "Users table to have PasswordHash and Salt fields",
+	// I should probably use the Salt.
+
+	// Let's implement it by appending salt to password.
+
+	err = bcrypt.CompareHashAndPassword(passwordHash, []byte(password+string(salt)))
+	if err != nil {
+		return "", false, status.Error(codes.Unauthenticated, "invalid credentials")
+	}
+
+	return userID, isAdmin.Bool, nil
+}
+
+func (db *SpannerDB) VerifyPassword(ctx context.Context, userID, password string) error {
+	stmt := spanner.Statement{
+		SQL: `SELECT PasswordHash, Salt FROM Users WHERE UserId = @uid`,
+		Params: map[string]interface{}{
+			"uid": userID,
+		},
+	}
+	iter := db.client.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	row, err := iter.Next()
+	if err == iterator.Done {
+		return status.Error(codes.NotFound, "user not found")
+	}
+	if err != nil {
+		return err
+	}
+
+	var passwordHash []byte
+	var salt []byte
+
+	if err := row.Columns(&passwordHash, &salt); err != nil {
+		return err
+	}
+
+	err = bcrypt.CompareHashAndPassword(passwordHash, []byte(password+string(salt)))
+	if err != nil {
+		return status.Error(codes.Unauthenticated, "invalid password")
+	}
+
+	return nil
+}
+
+func (db *SpannerDB) CreateUser(ctx context.Context, user CreateUserReq) (string, error) {
+	userID := uuid.New().String()
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return "", err
+	}
+
+	// Hash password + salt
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password+string(salt)), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = db.client.Apply(ctx, []*spanner.Mutation{
+		spanner.Insert("Users",
+			[]string{"UserId", "Username", "PasswordHash", "Salt", "DisplayName", "IsAdmin", "CreatedAt"},
+			[]interface{}{userID, user.Username, hashedPassword, salt, user.DisplayName, user.IsAdmin, spanner.CommitTimestamp},
+		),
+	})
+	if err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
+func (db *SpannerDB) UpdatePassword(ctx context.Context, userID, newPassword string) error {
+	salt := make([]byte, 32)
+	if _, err := rand.Read(salt); err != nil {
+		return err
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword+string(salt)), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.client.Apply(ctx, []*spanner.Mutation{
+		spanner.Update("Users",
+			[]string{"UserId", "PasswordHash", "Salt"},
+			[]interface{}{userID, hashedPassword, salt},
+		),
+	})
+	return err
 }
 
 func (db *SpannerDB) HealthCheck(ctx context.Context) (int64, error) {

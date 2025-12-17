@@ -10,6 +10,11 @@ type MockDB struct {
 	UpdateProfileFn  func(ctx context.Context, userID string, displayName string, publicKey string) error
 	GetRoomMembersFn func(ctx context.Context, roomID string) ([]*RoomMember, error)
 	SyncFn           func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error)
+	// Auth
+	AuthenticateUserFn func(ctx context.Context, username, password string) (string, bool, error)
+	VerifyPasswordFn   func(ctx context.Context, userID, password string) error
+	CreateUserFn       func(ctx context.Context, user CreateUserReq) (string, error)
+	UpdatePasswordFn   func(ctx context.Context, userID, newPassword string) error
 }
 
 func (m *MockDB) HealthCheck(ctx context.Context) (int64, error) {
@@ -38,4 +43,32 @@ func (m *MockDB) Sync(ctx context.Context, userID string, lastSync time.Time, ro
 		return m.SyncFn(ctx, userID, lastSync, rooms, messages)
 	}
 	return []*RoomResult{}, []*MsgResult{}, []*UserResult{}, nil
+}
+
+func (m *MockDB) AuthenticateUser(ctx context.Context, username, password string) (string, bool, error) {
+	if m.AuthenticateUserFn != nil {
+		return m.AuthenticateUserFn(ctx, username, password)
+	}
+	return "mock-user-id", false, nil
+}
+
+func (m *MockDB) VerifyPassword(ctx context.Context, userID, password string) error {
+	if m.VerifyPasswordFn != nil {
+		return m.VerifyPasswordFn(ctx, userID, password)
+	}
+	return nil
+}
+
+func (m *MockDB) CreateUser(ctx context.Context, user CreateUserReq) (string, error) {
+	if m.CreateUserFn != nil {
+		return m.CreateUserFn(ctx, user)
+	}
+	return "new-user-id", nil
+}
+
+func (m *MockDB) UpdatePassword(ctx context.Context, userID, newPassword string) error {
+	if m.UpdatePasswordFn != nil {
+		return m.UpdatePasswordFn(ctx, userID, newPassword)
+	}
+	return nil
 }
