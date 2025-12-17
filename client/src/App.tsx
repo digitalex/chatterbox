@@ -46,13 +46,8 @@ function ChatterboxApp() {
   const rooms = useLiveQuery(async () => await db.rooms.toArray());
 
   const handleCreateRoom = async (name: string) => {
+    // createRoom now adds to DB internally
     const room = await createRoom(name);
-    await db.rooms.add({
-      room_id: room.room_id,
-      last_read_message_id: 0,
-      name: room.name,
-      created_at: room.created_at,
-    });
     setActiveRoomId(room.room_id);
   };
 

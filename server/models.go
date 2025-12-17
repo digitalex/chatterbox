@@ -8,35 +8,49 @@ import (
 )
 
 type UserResult struct {
-    UserID      string `json:"user_id"`
-    DisplayName string `json:"display_name"`
+	UserID      string `json:"user_id"`
+	DisplayName string `json:"display_name"`
 }
 
 // API Request/Response shapes
 type SyncRequest struct {
 	LastSyncedAt *time.Time `json:"last_synced_at"` // Nullable for first load
+	Rooms        []RoomReq  `json:"rooms"`
+	Messages     []MsgReq   `json:"messages"`
 }
 
 type SyncResponse struct {
-    SyncTimestamp time.Time     `json:"sync_timestamp"`
-    Rooms         []*RoomResult `json:"rooms"`
-    Messages      []*MsgResult  `json:"messages"`
-    Users         []*UserResult `json:"users"`
+	SyncTimestamp time.Time     `json:"sync_timestamp"`
+	Rooms         []*RoomResult `json:"rooms"`
+	Messages      []*MsgResult  `json:"messages"`
+	Users         []*UserResult `json:"users"`
+}
+
+// Input structures for SyncRequest
+type RoomReq struct {
+	RoomID string `json:"room_id"` // Client generated UUID
+	Name   string `json:"name"`
+}
+
+type MsgReq struct {
+	RoomID    string      `json:"room_id"`
+	MessageID int64       `json:"message_id"`
+	Content   interface{} `json:"content"` // Any JSON
 }
 
 // Data structures for JSON response
 type RoomResult struct {
-	RoomID           string `json:"room_id"`
-	Name             string `json:"name"`
+	RoomID            string `json:"room_id"`
+	Name              string `json:"name"`
 	LastReadMessageID int64  `json:"last_read_message_id"`
 }
 
 type MsgResult struct {
-	RoomID    string            `json:"room_id"`
-	MessageID int64             `json:"message_id"`
-	SenderID  string            `json:"sender_id"`
-	Content   spanner.NullJSON  `json:"content"` // Handles the E2EE JSON blob
-	CreatedAt time.Time         `json:"created_at"`
+	RoomID    string           `json:"room_id"`
+	MessageID int64            `json:"message_id"`
+	SenderID  string           `json:"sender_id"`
+	Content   spanner.NullJSON `json:"content"` // Handles the E2EE JSON blob
+	CreatedAt time.Time        `json:"created_at"`
 }
 
 // Update ProfileReq
@@ -47,16 +61,14 @@ type ProfileReq struct {
 
 // Add a Response struct for the new endpoint
 type RoomMember struct {
-    UserID    string `json:"user_id"`
-    PublicKey string `json:"public_key"`
+	UserID    string `json:"user_id"`
+	PublicKey string `json:"public_key"`
 }
 
 // Database interface abstracts the data store interactions
 type Database interface {
 	HealthCheck(ctx context.Context) (int64, error)
-	CreateRoom(ctx context.Context, roomID string, name string, userID string) error
 	UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error
 	GetRoomMembers(ctx context.Context, roomID string) ([]*RoomMember, error)
-	SendMessage(ctx context.Context, roomID string, userID string, msgID int64, content interface{}) error
-	Sync(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error)
+	Sync(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error)
 }

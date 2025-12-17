@@ -1,4 +1,4 @@
-import { db } from './db';
+import { db, type Room, type Message } from './db';
 
 // 1. DYNAMIC API URL
 // Uses the variable from .env.production or .env.local. 
@@ -17,7 +17,7 @@ if (!storedId) {
 }
 
 // Export the persistent ID (e.g. "a1b2-c3d4-...")
-export const USER_ID = storedId;
+export const USER_ID = storedId!;
 
 // Token Cache
 let authToken: string | null = null;
@@ -46,7 +46,11 @@ export async function syncData() {
     const config = await db.config.get('last_synced_at');
     const lastSyncedAt = config?.value || null;
 
-    // 2. Call Server
+    // 2. Gather unsynced items
+    const unsyncedRooms = await db.rooms.where('synced').equals(0).toArray();
+    const unsyncedMessages = await db.messages.where('synced').equals(0).toArray();
+
+    // 3. Call Server
     const token = await getAuthToken();
     const response = await fetch(`${API_URL}/sync`, {
       method: 'POST',
@@ -54,7 +58,11 @@ export async function syncData() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({ last_synced_at: lastSyncedAt }),
+      body: JSON.stringify({
+        last_synced_at: lastSyncedAt,
+        rooms: unsyncedRooms.map(r => ({ room_id: r.room_id, name: r.name })),
+        messages: unsyncedMessages.map(m => ({ room_id: m.room_id, message_id: m.message_id, content: m.content }))
+      }),
     });
 
     if (response.status === 401) {
@@ -67,32 +75,77 @@ export async function syncData() {
 
     const data = await response.json();
 
-    // 3. Write to IndexedDB (Transactional)
+    // 4. Write to IndexedDB (Transactional)
     await db.transaction('rw', db.rooms, db.messages, db.config, db.users, async () => {
       
-      // A. Update Rooms
+      // A. Mark sent items as synced
+      if (unsyncedRooms.length > 0) {
+        await Promise.all(unsyncedRooms.map(r => db.rooms.update(r.room_id, { synced: 1 })));
+      }
+      if (unsyncedMessages.length > 0) {
+        // Need composite key for update if not using primary key directly?
+        // messages PK is [room_id+message_id]. update() takes the key.
+        await Promise.all(unsyncedMessages.map(m => db.messages.update([m.room_id, m.message_id], { synced: 1 })));
+      }
+
+      // B. Update Rooms (Downstream)
       if (data.rooms) {
-        await db.rooms.bulkPut(data.rooms);
+        // We use put to overwrite/update.
+        // Important: If we just synced a room we created, server might send it back.
+        // We should ensure we don't overwrite local fields if they are newer?
+        // But for now, server is truth for other fields.
+        // However, we want to keep `synced: 1`.
+        // If server sends it back, we can just put it.
+        // Map server response to local shape.
+        const roomUpdates = data.rooms.map((r: any) => ({
+            room_id: r.room_id,
+            name: r.name,
+            last_read_message_id: r.last_read_message_id,
+            // Preserve creation time if we have it, else use now? Server doesn't send CreatedAt in SyncResponse RoomResult?
+            // Let's check server RoomResult: { RoomID, Name, LastReadMessageID }. No CreatedAt.
+            // If we already have the room, keep created_at. If new, we need it.
+            // But wait, our local DB requires created_at.
+            // If it's a new room from server (invited), we don't know created_at.
+            // We might need to fetch it or just use SyncTimestamp.
+            synced: 1
+        }));
+
+        for (const r of roomUpdates) {
+            const existing = await db.rooms.get(r.room_id);
+            await db.rooms.put({
+                ...r,
+                created_at: existing?.created_at || new Date().toISOString(), // Fallback
+                unread_count: existing?.unread_count || 0
+            });
+        }
       }
 
-      // B. Insert Messages
+      // C. Insert Messages (Downstream)
       if (data.messages) {
-        await db.messages.bulkPut(data.messages);
+        const msgUpdates = data.messages.map((m: any) => ({
+            room_id: m.room_id,
+            message_id: m.message_id,
+            sender_id: m.sender_id,
+            content: m.content?.Value || m.content, // Handle Spanner NullJSON structure if raw, but API likely sends unwrapped JSON
+            created_at: m.created_at,
+            synced: 1
+        }));
+        await db.messages.bulkPut(msgUpdates);
       }
 
-      // C. Update Users (New Logic)
+      // D. Update Users
       if (data.users) {
         await db.users.bulkPut(data.users);
       }
 
-      // D. Update Sync Timestamp
+      // E. Update Sync Timestamp
       if (data.sync_timestamp) {
         await db.config.put({ key: 'last_synced_at', value: data.sync_timestamp });
       }
     });
 
-    if (data.messages?.length > 0) {
-        console.log(`✅ Synced. ${data.messages.length} new msgs.`);
+    if ((data.messages?.length || 0) > 0 || unsyncedMessages.length > 0) {
+        console.log(`✅ Synced. Sent: ${unsyncedMessages.length}, Recv: ${data.messages?.length || 0}`);
     }
     
   } catch (error) {
@@ -102,51 +155,54 @@ export async function syncData() {
 
 export async function sendMessage(roomId: string, content: any) {
   try {
-    const token = await getAuthToken();
-    const response = await fetch(`${API_URL}/rooms/${roomId}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ content }),
-    });
+    // 1. Create local message
+    // Use microseconds-ish timestamp to match server int64 expectations if needed,
+    // but JS Date.now() is milliseconds. Server previous logic was Microseconds.
+    // Let's use Date.now() * 1000 to be safe and compatible with server sorting if it expects micros.
+    const messageId = Date.now() * 1000;
 
-    if (response.status === 401) {
-        authToken = null;
-        throw new Error('Unauthorized');
-    }
+    const message: Message = {
+        room_id: roomId,
+        message_id: messageId,
+        sender_id: USER_ID,
+        content: content,
+        created_at: new Date().toISOString(),
+        synced: 0 // Not synced yet
+    };
 
-    if (!response.ok) throw new Error('Send failed');
-    
-    // Trigger an immediate sync to pull the new message back down
-    await syncData();
+    // 2. Save to DB
+    await db.messages.add(message);
+
+    // 3. Trigger Sync
+    syncData(); // Fire and forget
     
   } catch (error) {
     console.error('Send error:', error);
   }
 }
 
-export async function createRoom(name: string) {
+export async function createRoom(name: string): Promise<Room> {
   try {
-    const token = await getAuthToken();
-    const response = await fetch(`${API_URL}/rooms`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({ name }),
-    });
+    // 1. Create local room
+    const roomId = crypto.randomUUID();
+    const now = new Date().toISOString();
 
-    if (response.status === 401) {
-        authToken = null;
-        throw new Error('Unauthorized');
-    }
+    const room: Room = {
+        room_id: roomId,
+        name: name,
+        created_at: now,
+        last_read_message_id: 0,
+        unread_count: 0,
+        synced: 0
+    };
 
-    if (!response.ok) throw new Error('Create room failed');
+    // 2. Save to DB
+    await db.rooms.add(room);
 
-    return await response.json();
+    // 3. Trigger Sync
+    syncData();
+
+    return room;
   } catch (error) {
     console.error('Create room error:', error);
     throw error;
