@@ -112,6 +112,8 @@ func (s *Server) routes() {
 		r.Post("/api/sync", s.syncHandler)
 		r.Post("/api/me", s.updateProfileHandler)
 		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
+		r.Post("/api/users", s.createUserHandler)
+		r.Post("/api/change-password", s.changePasswordHandler)
 	})
 }
 

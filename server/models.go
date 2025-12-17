@@ -65,10 +65,29 @@ type RoomMember struct {
 	PublicKey string `json:"public_key"`
 }
 
+// Auth Requests
+type CreateUserReq struct {
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	DisplayName string `json:"display_name"`
+	IsAdmin     bool   `json:"is_admin"`
+}
+
+type ChangePasswordReq struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
 // Database interface abstracts the data store interactions
 type Database interface {
 	HealthCheck(ctx context.Context) (int64, error)
 	UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error
 	GetRoomMembers(ctx context.Context, roomID string) ([]*RoomMember, error)
 	Sync(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error)
+
+	// Auth
+	AuthenticateUser(ctx context.Context, username, password string) (string, bool, error) // Returns UserID, IsAdmin, error
+	VerifyPassword(ctx context.Context, userID, password string) error                     // Verifies password for userID
+	CreateUser(ctx context.Context, user CreateUserReq) (string, error)                    // Returns new UserID
+	UpdatePassword(ctx context.Context, userID, newPassword string) error
 }
