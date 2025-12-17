@@ -6,6 +6,8 @@ import (
 
 	"cloud.google.com/go/spanner"
 	"google.golang.org/api/iterator"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type SpannerDB struct {
@@ -30,45 +32,6 @@ func (db *SpannerDB) HealthCheck(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 	return val, nil
-}
-
-func (db *SpannerDB) CreateRoom(ctx context.Context, roomID string, name string, userID string) error {
-	roomMutation := spanner.Insert("Rooms",
-		[]string{"RoomId", "Name", "CreatedAt"},
-		[]interface{}{roomID, name, spanner.CommitTimestamp},
-	)
-
-	memberMutation := spanner.Insert("RoomMembers",
-		[]string{"RoomId", "UserId", "JoinedAt", "LastReadMessageId"},
-		[]interface{}{roomID, userID, spanner.CommitTimestamp, 0},
-	)
-
-	_, err := db.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		stmt := spanner.Statement{
-			SQL:    "SELECT 1 FROM Users WHERE UserId = @uid",
-			Params: map[string]interface{}{"uid": userID},
-		}
-		iter := txn.Query(ctx, stmt)
-		_, err := iter.Next()
-		iter.Stop()
-
-		var mutations []*spanner.Mutation
-
-		if err == iterator.Done {
-			userMutation := spanner.Insert("Users",
-				[]string{"UserId", "DisplayName", "Email", "PublicKey", "CreatedAt"},
-				[]interface{}{userID, "Anonymous", "anon", "", spanner.CommitTimestamp},
-			)
-			mutations = append(mutations, userMutation)
-		} else if err != nil {
-			return err
-		}
-
-		mutations = append(mutations, roomMutation, memberMutation)
-		return txn.BufferWrite(mutations)
-	})
-
-	return err
 }
 
 func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error {
@@ -117,17 +80,84 @@ func (db *SpannerDB) GetRoomMembers(ctx context.Context, roomID string) ([]*Room
 	return members, nil
 }
 
-func (db *SpannerDB) SendMessage(ctx context.Context, roomID string, userID string, msgID int64, content interface{}) error {
-	m := spanner.Insert("Messages",
-		[]string{"RoomId", "MessageId", "SenderId", "Content", "CreatedAt"},
-		[]interface{}{roomID, msgID, userID, spanner.NullJSON{Value: content, Valid: true}, spanner.CommitTimestamp},
-	)
+func (db *SpannerDB) Sync(ctx context.Context, userID string, lastSync time.Time, newRooms []RoomReq, newMessages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+	// 1. Write new data (Upstream)
+	if len(newRooms) > 0 || len(newMessages) > 0 {
+		_, err := db.client.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+			// Check if user exists to ensure FK consistency, fail if not.
+			stmt := spanner.Statement{
+				SQL:    "SELECT 1 FROM Users WHERE UserId = @uid",
+				Params: map[string]interface{}{"uid": userID},
+			}
+			iter := txn.Query(ctx, stmt)
+			_, err := iter.Next()
+			iter.Stop()
 
-	_, err := db.client.Apply(ctx, []*spanner.Mutation{m})
-	return err
-}
+			if err == iterator.Done {
+				return status.Error(codes.NotFound, "user not found")
+			} else if err != nil {
+				return err
+			}
 
-func (db *SpannerDB) Sync(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+			var mutations []*spanner.Mutation
+
+			// Process new rooms
+			for _, r := range newRooms {
+				if r.Name == "" {
+					return status.Error(codes.InvalidArgument, "room name cannot be empty")
+				}
+				// Use Insert to prevent overwriting existing rooms
+				roomMutation := spanner.Insert("Rooms",
+					[]string{"RoomId", "Name", "CreatedAt"},
+					[]interface{}{r.RoomID, r.Name, spanner.CommitTimestamp},
+				)
+				// Insert member. If room already existed (and Insert failed), the transaction will abort.
+				// If room is new, this member must also be new for this room.
+				memberMutation := spanner.Insert("RoomMembers",
+					[]string{"RoomId", "UserId", "JoinedAt", "LastReadMessageId"},
+					[]interface{}{r.RoomID, userID, spanner.CommitTimestamp, 0},
+				)
+				mutations = append(mutations, roomMutation, memberMutation)
+			}
+
+			// Process new messages
+			for _, m := range newMessages {
+				// Use Insert to prevent overwriting messages/timestamps
+				msgMutation := spanner.Insert("Messages",
+					[]string{"RoomId", "MessageId", "SenderId", "Content", "CreatedAt"},
+					[]interface{}{m.RoomID, m.MessageID, userID, spanner.NullJSON{Value: m.Content, Valid: true}, spanner.CommitTimestamp},
+				)
+				mutations = append(mutations, msgMutation)
+			}
+
+			return txn.BufferWrite(mutations)
+		})
+		if err != nil {
+			// If insertion failed (e.g. AlreadyExists), we might want to ignore it for "local first" (idempotency)
+			// BUT, the review pointed out security risks. If we ignore AlreadyExists on rooms,
+			// we must NOT add the user to the room if they weren't already there (or check permissions).
+			// Given the current simple schema (no strict ownership/authz beyond knowing RoomID),
+			// spanner.Insert failing means "room exists".
+			// If the client retries the SAME creation, we should probably succeed without error but do nothing.
+			// However, `spanner.Insert` returns `codes.AlreadyExists`.
+			// Since we want "Sync" to be idempotent, we should catch AlreadyExists and ignore it?
+			// The reviewer said "InsertOrUpdate... effectively allows unauthorized users to join any room".
+			// If we use Insert, it fails if room exists. So unauthorized users can't overwrite.
+			// But if they just want to join? That should likely be a separate action or implicit?
+			// For "CreateRoom", it implies *new* room. So failing if it exists is correct behavior for "Create".
+			// If it's a retry of the *same* creation (same ID), we might want to tolerate it.
+			// But distinguishing retry from collision is hard without more metadata.
+			// Safest for now: return the error. Client can handle conflict.
+			return nil, nil, nil, err
+		}
+	} else {
+		// Just to be safe, if we are only reading but the user doesn't exist, should we fail?
+		// The query `SELECT ... FROM RoomMembers ... WHERE UserId = @uid` will just return empty if user has no rooms.
+		// If strict "user must exist" is needed, we could check here too.
+		// But usually Sync is safe to run empty. The "write" path is where FK violations happen.
+	}
+
+	// 2. Read updates (Downstream)
 	roomIter := db.client.Single().Query(ctx, spanner.Statement{
 		SQL: `SELECT r.RoomId, r.Name, rm.LastReadMessageId
               FROM RoomMembers rm

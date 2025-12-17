@@ -110,8 +110,6 @@ func (s *Server) routes() {
 	s.router.Group(func(r chi.Router) {
 		r.Use(JWTMiddleware)
 		r.Post("/api/sync", s.syncHandler)
-		r.Post("/api/rooms", s.createRoomHandler)
-		r.Post("/api/rooms/{roomID}/messages", s.sendMessageHandler)
 		r.Post("/api/me", s.updateProfileHandler)
 		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
 	})

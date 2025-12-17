@@ -70,7 +70,7 @@
     "/api/sync": {
       "post": {
         "summary": "Sync Data",
-        "description": "Syncs rooms, messages, and users for the authenticated user.",
+        "description": "Syncs rooms, messages, and users. Accepts new local data (rooms, messages) and returns updates from server.",
         "security": [
           {
             "X-User-ID": []
@@ -99,133 +99,6 @@
           },
           "401": {
             "description": "Unauthorized - Missing X-User-ID header"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/api/rooms": {
-      "post": {
-        "summary": "Create Room",
-        "description": "Creates a new chat room.",
-        "security": [
-          {
-            "X-User-ID": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Name of the room"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Room created successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "room_id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "created_at": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request - Invalid JSON or missing name"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
-    "/api/rooms/{roomID}/messages": {
-      "post": {
-        "summary": "Send Message",
-        "description": "Sends a message to a specific room.",
-        "security": [
-          {
-            "X-User-ID": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "roomID",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            },
-            "description": "ID of the room"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "content": {
-                    "description": "Any JSON content (text or encrypted blob)",
-                    "nullable": true
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Message sent successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message_id": {
-                      "type": "integer",
-                      "format": "int64"
-                    },
-                    "status": {
-                      "type": "string",
-                      "example": "sent"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request - Invalid JSON"
           },
           "500": {
             "description": "Internal Server Error"
@@ -311,6 +184,59 @@
             "format": "date-time",
             "nullable": true,
             "description": "Timestamp of the last sync. Null for first load."
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoomReq"
+            },
+            "description": "List of locally created rooms to sync to server"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MsgReq"
+            },
+            "description": "List of locally created messages to sync to server"
+          }
+        }
+      },
+      "RoomReq": {
+        "type": "object",
+        "required": [
+          "room_id",
+          "name"
+        ],
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client generated UUID for the room"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "MsgReq": {
+        "type": "object",
+        "required": [
+          "room_id",
+          "message_id"
+        ],
+        "properties": {
+          "room_id": {
+            "type": "string",
+            "description": "ID of the room"
+          },
+          "message_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Client generated message ID"
+          },
+          "content": {
+             "description": "Any JSON content (text or encrypted blob)",
+             "nullable": true
           }
         }
       },
