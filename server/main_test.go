@@ -257,6 +257,52 @@ func TestHealthCheckError(t *testing.T) {
 	}
 }
 
+func TestLogin(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+
+	reqBody := `{"user_id": "test-user"}`
+	req, _ := http.NewRequest("POST", "/api/login", strings.NewReader(reqBody))
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+
+	var resp LoginResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if resp.Token == "" {
+		t.Error("Expected token in response, got empty string")
+	}
+}
+
+func TestLoginBadRequest(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+
+	// Test invalid JSON
+	req, _ := http.NewRequest("POST", "/api/login", strings.NewReader(`{"user_id":`))
+	rr := httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code for invalid JSON: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+
+	// Test missing user_id
+	req, _ = http.NewRequest("POST", "/api/login", strings.NewReader(`{}`))
+	rr = httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code for missing user_id: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
 func TestSyncError(t *testing.T) {
 	mockDB := &MockDB{
 		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
