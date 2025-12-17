@@ -7,6 +7,7 @@ export interface Room {
   last_read_message_id: number; // Server's view of our read status
   created_at: string;           // ISO String
   unread_count?: number;        // Calculated locally
+  synced?: number;              // 0 = false, 1 = true (boolean indexing in dexie)
 }
 
 export interface Message {
@@ -15,6 +16,7 @@ export interface Message {
   sender_id: string;
   content: any; // Will be JSON (E2EE payload or plain text)
   created_at: string; // ISO String
+  synced?: number;    // 0 = false, 1 = true
 }
 
 export interface User {
@@ -38,6 +40,15 @@ class ChatDatabase extends Dexie {
     super('ChatterboxDB');
     
     // Define indexes (Schema)
+    // Upgrading to version 3 to include 'synced' index
+    this.version(3).stores({
+      rooms: 'room_id, synced',
+      messages: '[room_id+message_id], room_id, created_at, synced',
+      config: 'key',
+      users: 'user_id'
+    });
+
+    // Backward compatibility for v2
     this.version(2).stores({
       rooms: 'room_id',
       messages: '[room_id+message_id], room_id, created_at',
@@ -48,4 +59,3 @@ class ChatDatabase extends Dexie {
 }
 
 export const db = new ChatDatabase();
-
