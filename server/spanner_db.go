@@ -46,29 +46,8 @@ func (db *SpannerDB) AuthenticateUser(ctx context.Context, username, password st
 		return "", false, err
 	}
 
-	// Verify password
-	// Currently we are just using bcrypt directly.
-	// If we were using the Salt, we would append it.
-	// But bcrypt handles salt internally if we just use GenerateFromPassword.
-	// However, the DB schema has a Salt column.
-	// If we use standard bcrypt, we don't need to manage salt manually.
-	// But the user said "I have already updated the database's Users table to have PasswordHash and Salt fields".
-	// Maybe they want us to use the salt?
-	// Standard bcrypt stores salt in the hash string.
-	// If the schema requires Salt, maybe we should use it?
-	// Let's assume standard bcrypt usage (GenerateFromPassword) which includes salt in the hash.
-	// The Salt column might be extra or intended for something else, OR
-	// maybe we should append salt to password before hashing?
-	// "We should use bcrypt for the secure hashing."
-	// Let's use the Salt column to add entropy.
-	// passwordToHash = password + salt
-
-	// However, usually bcrypt generates its own salt.
-	// If I follow the instruction "Users table to have PasswordHash and Salt fields",
-	// I should probably use the Salt.
-
-	// Let's implement it by appending salt to password.
-
+	// Verify password by appending the stored salt to the provided password
+	// and comparing it against the bcrypt hash.
 	err = bcrypt.CompareHashAndPassword(passwordHash, []byte(password+string(salt)))
 	if err != nil {
 		return "", false, status.Error(codes.Unauthenticated, "invalid credentials")
