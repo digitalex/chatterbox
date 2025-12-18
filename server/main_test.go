@@ -77,7 +77,7 @@ func TestSync(t *testing.T) {
 
 	reqBody := `{"last_synced_at": "2023-01-01T00:00:00Z"}`
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
@@ -117,7 +117,7 @@ func TestSyncUpstream(t *testing.T) {
 		"messages": [{"room_id": "r1", "message_id": 1, "content": "Hello"}]
 	}`
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
@@ -154,7 +154,7 @@ func TestUpdateProfile(t *testing.T) {
 
 	reqBody := `{"display_name": "New Name", "public_key": "key123"}`
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
@@ -169,7 +169,7 @@ func TestUpdateProfile(t *testing.T) {
 func TestUpdateProfileBadRequest(t *testing.T) {
 	srv := NewServer(&MockDB{}, nil)
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name":`)) // Invalid JSON
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
@@ -192,7 +192,7 @@ func TestGetRoomMembers(t *testing.T) {
 	srv := NewServer(mockDB, nil)
 
 	req, _ := http.NewRequest("GET", "/api/rooms/room-1/members", nil)
-	token, _ := GenerateToken("u1")
+	token, _ := GenerateToken("u1", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 
@@ -265,7 +265,7 @@ func TestSyncError(t *testing.T) {
 	}
 	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{}`))
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
@@ -284,7 +284,7 @@ func TestUpdateProfileError(t *testing.T) {
 	}
 	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "error", "public_key": "error"}`))
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
@@ -303,7 +303,7 @@ func TestGetRoomMembersError(t *testing.T) {
 	}
 	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("GET", "/api/rooms/r1/members", nil)
-	token, _ := GenerateToken("test-user")
+	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
