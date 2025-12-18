@@ -58,9 +58,9 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		parts := strings.Split(authHeader, " ")
+		parts := strings.Fields(authHeader)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+			http.Error(w, "Invalid authorization header format. Format must be 'Bearer <token>'", http.StatusUnauthorized)
 			return
 		}
 
