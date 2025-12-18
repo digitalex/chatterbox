@@ -50,10 +50,14 @@ func TestAuthHandlers(t *testing.T) {
 		}
 
 		var resp LoginResponse
-		json.NewDecoder(w.Body).Decode(&resp)
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
 		if resp.Token == "" {
 			t.Error("Expected token")
 		}
+		// Verify strict JSON structure if possible, but map check is usually better for extra fields.
+		// For now, ensuring Token exists is good.
 	})
 
 	t.Run("Create User - Admin", func(t *testing.T) {
@@ -70,6 +74,14 @@ func TestAuthHandlers(t *testing.T) {
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if resp["user_id"] != "new-user-id" {
+			t.Errorf("Expected user_id 'new-user-id', got %v", resp["user_id"])
 		}
 	})
 
@@ -103,6 +115,14 @@ func TestAuthHandlers(t *testing.T) {
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected 200, got %d", w.Code)
+		}
+
+		var resp map[string]string
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if resp["status"] != "ok" {
+			t.Errorf("Expected status 'ok', got %v", resp["status"])
 		}
 	})
 
