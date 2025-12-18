@@ -1,44 +1,64 @@
 import { useState } from 'react';
-import { useAuth } from './AuthContext'; // Import the hook
-import './Login.css'; // We will add some styles below
+import { useAuth } from './AuthContext';
+import './Login.css';
 
 export function Login() {
   const { login } = useAuth();
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!username.trim() || !password.trim()) return;
 
     setIsSubmitting(true);
-    await login(name);
-    // No need to setSubmitting(false) or redirect, 
-    // the AuthContext state change will trigger App to unmount this component.
+    setError('');
+
+    try {
+        await login(username, password);
+    } catch (err) {
+        setError('Login failed. Please check your credentials.');
+        setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="login-wrapper">
       <div className="login-card">
         <h1>👋 Welcome</h1>
-        <p>Choose a display name to join the conversation.</p>
+        <p>Please log in to continue.</p>
         
+        {error && <div className="error-message">{error}</div>}
+
         <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="Your Name (e.g. Alex)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={isSubmitting}
-            autoFocus
-          />
-          <button type="submit" disabled={isSubmitting || !name.trim()}>
-            {isSubmitting ? 'Joining...' : 'Continue'}
+          <div className="form-group">
+              <label>Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={isSubmitting}
+                autoFocus
+              />
+          </div>
+          <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isSubmitting}
+              />
+          </div>
+          <button type="submit" disabled={isSubmitting || !username.trim() || !password.trim()}>
+            {isSubmitting ? 'Logging in...' : 'Login'}
           </button>
         </form>
         
         <div className="login-footer">
-           You will remain anonymous. No password required.
+           Don't have an account? Contact your administrator.
         </div>
       </div>
     </div>

@@ -1,22 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { syncData, sendMessage, createRoom, USER_ID, API_URL } from '../sync';
+import { syncData, sendMessage, createRoom, setAuthInfo, clearAuthInfo, API_URL } from '../sync';
 import { db } from '../db';
 
 // Mock fetch
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
 
+const MOCK_TOKEN = "mock-token";
+const MOCK_USER_ID = "test-user";
+
 describe('Sync Logic', () => {
   beforeEach(async () => {
     fetchMock.mockReset();
     await db.delete();
     await db.open();
-    // Clear config
     await db.config.clear();
+
+    // Set Auth Info
+    setAuthInfo(MOCK_USER_ID, MOCK_TOKEN);
   });
 
   afterEach(() => {
     vi.clearAllMocks();
+    clearAuthInfo();
   });
 
   it('should sync data from server', async () => {
@@ -33,19 +39,6 @@ describe('Sync Logic', () => {
       sync_timestamp: '2023-01-01T00:02:00Z'
     };
 
-    // Because previous tests might have set cached authToken, we may or may not see a login call first.
-    // However, in this isolated test execution (if it is the first one or if env is fresh), it will call login.
-    // Vitest runs in parallel threads by default but within a file it is sequential.
-    // authToken is a module-level variable in sync.ts. It persists across tests in the same file.
-
-    // To make tests deterministic, we need to handle both cases or assume persistence.
-    // Since 'should sync data from server' is the FIRST test, it WILL call login.
-
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ token: 'mock-token' }),
-    });
-
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponseData,
@@ -53,19 +46,14 @@ describe('Sync Logic', () => {
 
     await syncData();
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, `${API_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID }),
-    });
-
-    expect(fetchMock).toHaveBeenNthCalledWith(2, `${API_URL}/sync`, {
+    // Should call /sync directly with token
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer mock-token',
+        'Authorization': `Bearer ${MOCK_TOKEN}`,
       },
-      body: JSON.stringify({ last_synced_at: null }),
+      body: expect.stringContaining('"last_synced_at":null'),
     });
 
     const rooms = await db.rooms.toArray();
@@ -73,7 +61,6 @@ describe('Sync Logic', () => {
   });
 
   it('should include last_synced_at in request if available', async () => {
-    // authToken should be cached from previous test ('mock-token').
     await db.config.put({ key: 'last_synced_at', value: '2023-01-01T00:00:00Z' });
 
     fetchMock.mockResolvedValueOnce({
@@ -83,62 +70,49 @@ describe('Sync Logic', () => {
 
     await syncData();
 
-    // Should NOT call login again.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/sync`, expect.objectContaining({
-      body: JSON.stringify({ last_synced_at: '2023-01-01T00:00:00Z' }),
+      body: expect.stringContaining('"last_synced_at":"2023-01-01T00:00:00Z"'),
     }));
   });
 
   it('should send a message and trigger sync', async () => {
-    // authToken is cached ('mock-token').
-
-    // 1. Send Message Response
+    // Mock Sync Response
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({}), // Message sent response
-    });
-
-    // 2. Sync Response (triggered by sendMessage)
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}), // Sync response
+      json: async () => ({}),
     });
 
     await sendMessage('room-1', 'Hello');
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, `${API_URL}/rooms/room-1/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer mock-token',
-        },
-        body: JSON.stringify({ content: 'Hello' }),
-    });
+    // Wait for async syncData to potentially run
+    await new Promise(r => setTimeout(r, 10));
 
-    expect(fetchMock).toHaveBeenNthCalledWith(2, `${API_URL}/sync`, expect.anything());
+    const messages = await db.messages.toArray();
+    expect(messages).toHaveLength(1);
+    // Sync should have completed successfully
+    expect(messages[0].synced).toBe(1);
+
+    // Should trigger sync
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/sync`, expect.anything());
   });
 
-  it('should create a room', async () => {
-    // authToken is cached ('mock-token').
-    const newRoom = { room_id: 'new-room', name: 'New Room' };
-
+  it('should create a room and trigger sync', async () => {
+    // Mock Sync Response
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => newRoom,
+      json: async () => ({}),
     });
 
-    const result = await createRoom('New Room');
+    await createRoom('New Room');
 
-    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/rooms`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer mock-token',
-      },
-      body: JSON.stringify({ name: 'New Room' }),
-    });
+    // Wait for async syncData to potentially run
+    await new Promise(r => setTimeout(r, 10));
 
-    expect(result).toEqual(newRoom);
+    const rooms = await db.rooms.toArray();
+    expect(rooms).toHaveLength(1);
+    expect(rooms[0].name).toBe('New Room');
+
+    // Should trigger sync
+    expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/sync`, expect.anything());
   });
 });

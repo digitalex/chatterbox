@@ -6,38 +6,29 @@ import { db, type Room, type Message } from './db';
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 // 2. DYNAMIC USER ID
-// Check if we already have an identity in this browser
-const STORAGE_KEY = 'chatterbox_user_id';
-let storedId = localStorage.getItem(STORAGE_KEY);
+const USER_ID_KEY = 'chatterbox_user_id';
+const TOKEN_KEY = 'chatterbox_auth_token';
 
-if (!storedId) {
-  // If not, generate a new random UUID
-  storedId = crypto.randomUUID();
-  localStorage.setItem(STORAGE_KEY, storedId);
+export let USER_ID = localStorage.getItem(USER_ID_KEY);
+let authToken = localStorage.getItem(TOKEN_KEY);
+
+export function setAuthInfo(userId: string, token: string) {
+  USER_ID = userId;
+  authToken = token;
+  localStorage.setItem(USER_ID_KEY, userId);
+  localStorage.setItem(TOKEN_KEY, token);
 }
 
-// Export the persistent ID (e.g. "a1b2-c3d4-...")
-export const USER_ID = storedId!;
-
-// Token Cache
-let authToken: string | null = null;
+export function clearAuthInfo() {
+  USER_ID = null;
+  authToken = null;
+  localStorage.removeItem(USER_ID_KEY);
+  localStorage.removeItem(TOKEN_KEY);
+}
 
 export async function getAuthToken(): Promise<string> {
   if (authToken) return authToken;
-
-  const response = await fetch(`${API_URL}/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: USER_ID }),
-  });
-
-  if (!response.ok) {
-      throw new Error('Login failed');
-  }
-
-  const data = await response.json();
-  authToken = data.token;
-  return authToken!;
+  throw new Error('Not logged in');
 }
 
 export async function syncData() {
@@ -66,8 +57,9 @@ export async function syncData() {
     });
 
     if (response.status === 401) {
-      authToken = null; // Token might be expired
-      // Retry logic could be added here
+      // Token might be expired
+      // We could clearAuthInfo() here or let the UI handle it.
+      // For now just throw.
       throw new Error('Unauthorized');
     }
 
@@ -90,23 +82,10 @@ export async function syncData() {
 
       // B. Update Rooms (Downstream)
       if (data.rooms) {
-        // We use put to overwrite/update.
-        // Important: If we just synced a room we created, server might send it back.
-        // We should ensure we don't overwrite local fields if they are newer?
-        // But for now, server is truth for other fields.
-        // However, we want to keep `synced: 1`.
-        // If server sends it back, we can just put it.
-        // Map server response to local shape.
         const roomUpdates = data.rooms.map((r: any) => ({
             room_id: r.room_id,
             name: r.name,
             last_read_message_id: r.last_read_message_id,
-            // Preserve creation time if we have it, else use now? Server doesn't send CreatedAt in SyncResponse RoomResult?
-            // Let's check server RoomResult: { RoomID, Name, LastReadMessageID }. No CreatedAt.
-            // If we already have the room, keep created_at. If new, we need it.
-            // But wait, our local DB requires created_at.
-            // If it's a new room from server (invited), we don't know created_at.
-            // We might need to fetch it or just use SyncTimestamp.
             synced: 1
         }));
 
@@ -154,6 +133,7 @@ export async function syncData() {
 }
 
 export async function sendMessage(roomId: string, content: any) {
+  if (!USER_ID) throw new Error("User not logged in");
   try {
     // 1. Create local message
     // Use microseconds-ish timestamp to match server int64 expectations if needed,

@@ -20,14 +20,33 @@
 .login-card h1 { margin-bottom: 0.5rem; color: #1a1a1a; }
 .login-card p { color: #666; margin-bottom: 2rem; }
 
+.form-group {
+    text-align: left;
+    margin-bottom: 1rem;
+}
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #333;
+}
+.error-message {
+    background-color: #fee;
+    color: #c00;
+    padding: 0.75rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
 .login-card input {
   width: 100%;
   padding: 12px;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem; /* Reduced because form-group handles spacing */
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 16px;
-  box-sizing: border-box; /* Critical for padding */
+  box-sizing: border-box;
 }
 
 .login-card button {
@@ -41,6 +60,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s;
+  margin-top: 1rem;
 }
 
 .login-card button:disabled { background-color: #ccc; cursor: not-allowed; }
