@@ -115,4 +115,14 @@ describe('Sync Logic', () => {
     // Should trigger sync
     expect(fetchMock).toHaveBeenCalledWith(`${API_URL}/sync`, expect.anything());
   });
+
+  it('should skip sync silently if not logged in', async () => {
+    clearAuthInfo();
+    const consoleSpy = vi.spyOn(console, 'error');
+
+    await syncData();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
 });

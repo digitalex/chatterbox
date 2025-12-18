@@ -32,6 +32,8 @@ export async function getAuthToken(): Promise<string> {
 }
 
 export async function syncData() {
+  if (!authToken) return;
+
   try {
     // 1. Get last sync timestamp from local DB
     const config = await db.config.get('last_synced_at');
