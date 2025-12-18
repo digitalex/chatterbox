@@ -96,6 +96,14 @@ func TestSync(t *testing.T) {
 	if len(resp.Rooms) != 1 || resp.Rooms[0].RoomID != "1" {
 		t.Errorf("Unexpected rooms response")
 	}
+
+	if len(resp.Messages) != 1 || resp.Messages[0].MessageID != 1 {
+		t.Errorf("Unexpected messages response")
+	}
+
+	if len(resp.Users) != 1 || resp.Users[0].UserID != "u1" {
+		t.Errorf("Unexpected users response")
+	}
 }
 
 func TestSyncUpstream(t *testing.T) {
@@ -164,6 +172,10 @@ func TestUpdateProfile(t *testing.T) {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusOK)
 	}
+
+	if rr.Body.Len() > 0 {
+		t.Errorf("Expected empty body, got %s", rr.Body.String())
+	}
 }
 
 func TestUpdateProfileBadRequest(t *testing.T) {
@@ -209,6 +221,9 @@ func TestGetRoomMembers(t *testing.T) {
 	}
 	if len(members) != 1 || members[0].UserID != "u1" {
 		t.Errorf("Unexpected members response")
+	}
+	if members[0].PublicKey != "key1" {
+		t.Errorf("Expected PublicKey 'key1', got %s", members[0].PublicKey)
 	}
 }
 
