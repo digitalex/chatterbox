@@ -1,13 +1,21 @@
 # Chatterbox
 
-Chatterbox is a fully open source, free, and end-to-end (E2E) encrypted chat application. It is designed to be lightning fast and run anywhere, providing a secure communication platform for everyone.
+Chatterbox is a fully open source, free, and secure chat application. It is designed to be lightning fast and run anywhere, providing a private communication platform for everyone.
 
 ## Features
 
 -   **Open Source:** Free to use, modify, and distribute.
--   **E2E Encrypted:** Your messages are secure and can only be read by you and the recipient.
+-   **Secure Authentication:** User accounts protected by bcrypt password hashing and JWT sessions.
 -   **Lightning Fast:** Optimized for speed and performance.
 -   **Cross-Platform:** Runs on any device with a modern web browser.
+
+## Authentication
+
+Chatterbox uses a username/password authentication system.
+
+-   **Login:** Users log in via the client to receive a JWT.
+-   **Registration:** Currently, user creation is restricted to Administrators via the API.
+-   **Security:** Passwords are salted and hashed using bcrypt.
 
 ## Architecture
 

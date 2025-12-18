@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-**Chatterbox** is a local-first, family-oriented chat application. It prioritizes low-friction onboarding (no email/passwords) and offline-first capabilities.
+**Chatterbox** is a local-first, family-oriented chat application. It prioritizes secure authentication and offline-first capabilities.
 
 ### Core Philosophy
 
 1. **Local-First:** The client (React + Dexie) is the source of truth for the UI. Users write to IndexedDB immediately.
 2. **Sync Loop:** A background process synchronizes local IndexedDB data with the remote Spanner database.
-3. **Possession-Based Auth:** Access is granted via Invite Codes, not user accounts. If a user has the code, they are authenticated.
+3. **User-Based Auth:** Access is granted via Username/Password login, which returns a JWT. User management is handled by administrators.
 
 ---
 
@@ -66,15 +66,14 @@ Used for **Content Creation** (Messages, New Rooms).
 
 ### Pattern B: RPC / Standalone Calls (Immediate)
 
-Used for **Permissions & Discovery** (Joining, Inviting).
+Used for **Authentication & Profile Management**.
 
-* These **CANNOT** be local-first because they require server authority (e.g., uniqueness of a short code).
-* **Join Flow:**
-1. `POST /api/join` with `{ inviteCode }`.
-2. Server validates code via Spanner Transaction.
-3. Server adds user to `RoomMembers`.
-4. Client receives `RoomId` + `AuthToken`.
-5. Client immediately triggers **Sync Loop** to fetch the room content.
+* These **CANNOT** be local-first because they require server authority (e.g., password validation).
+* **Login Flow:**
+1. `POST /api/login` with `{ username, password }`.
+2. Server validates credentials against `Users` table.
+3. Server returns JWT Token.
+4. Client stores token and triggers **Sync Loop** to fetch user data and rooms.
 
 
 ---
@@ -92,7 +91,7 @@ Used for **Permissions & Discovery** (Joining, Inviting).
 
 ## Common Tasks & Rules for Agents
 
-1. **Adding UI Features:** Always implement the `useLiveQuery` hook from Dexie. Never fetch from the API directly in a component (except for RPCs like Join).
+1. **Adding UI Features:** Always implement the `useLiveQuery` hook from Dexie. Never fetch from the API directly in a component (except for RPCs like Login).
 2. **Schema Changes:** If you modify the DB, you must update:
 * The Spanner DDL (Server).
 * The Dexie Schema definition (`db.ts`).
