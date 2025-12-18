@@ -319,10 +319,6 @@
       },
       "ProfileReq": {
         "type": "object",
-        "required": [
-          "display_name",
-          "public_key"
-        ],
         "properties": {
           "display_name": {
             "type": "string"

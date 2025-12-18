@@ -154,18 +154,31 @@ func (db *SpannerDB) HealthCheck(ctx context.Context) (int64, error) {
 	return val, nil
 }
 
-func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error {
-	userMutation := spanner.InsertOrUpdate("Users",
-		[]string{"UserId", "DisplayName", "Email", "PublicKey", "CreatedAt"},
-		[]interface{}{userID, displayName, "anon", publicKey, spanner.CommitTimestamp},
-	)
+func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayName *string, publicKey *string) error {
+	var cols []string
+	var vals []interface{}
 
-	roomMutation := spanner.InsertOrUpdate("RoomMembers",
-		[]string{"RoomId", "UserId", "JoinedAt", "LastReadMessageId"},
-		[]interface{}{"room-general-001", userID, spanner.CommitTimestamp, 0},
-	)
+	cols = append(cols, "UserId")
+	vals = append(vals, userID)
 
-	_, err := db.client.Apply(ctx, []*spanner.Mutation{userMutation, roomMutation})
+	if displayName != nil {
+		cols = append(cols, "DisplayName")
+		vals = append(vals, *displayName)
+	}
+
+	if publicKey != nil {
+		cols = append(cols, "PublicKey")
+		vals = append(vals, *publicKey)
+	}
+
+	if len(cols) == 1 {
+		// Nothing to update
+		return nil
+	}
+
+	userMutation := spanner.Update("Users", cols, vals)
+
+	_, err := db.client.Apply(ctx, []*spanner.Mutation{userMutation})
 	return err
 }
 
