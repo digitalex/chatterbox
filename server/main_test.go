@@ -216,7 +216,7 @@ func TestSendMessageBadRequest(t *testing.T) {
 
 func TestUpdateProfile(t *testing.T) {
 	mockDB := &MockDB{
-		UpdateProfileFn: func(ctx context.Context, userID string, displayName string, publicKey string) error {
+		UpdateProfileFn: func(ctx context.Context, userID string, displayName string) error {
 			if displayName != "New Name" {
 				t.Errorf("Expected DisplayName 'New Name', got %s", displayName)
 			}
@@ -225,7 +225,7 @@ func TestUpdateProfile(t *testing.T) {
 	}
 	srv := NewServer(mockDB, nil)
 
-	reqBody := `{"display_name": "New Name", "public_key": "key123"}`
+	reqBody := `{"display_name": "New Name"}`
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
 	token, _ := GenerateToken("test-user")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -257,7 +257,7 @@ func TestUpdateProfileMissingFields(t *testing.T) {
 	srv := NewServer(&MockDB{}, nil)
 
 	// Test missing display_name
-	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"public_key": "key123"}`))
+	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{}`))
 	token, _ := GenerateToken("test-user")
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()
@@ -265,17 +265,6 @@ func TestUpdateProfileMissingFields(t *testing.T) {
 
 	if status := rr.Code; status != http.StatusBadRequest {
 		t.Errorf("Expected 400 for missing display_name, got %v", status)
-	}
-
-	// Test missing public_key
-	req, _ = http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "Name"}`))
-	token, _ = GenerateToken("test-user")
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr = httptest.NewRecorder()
-	srv.router.ServeHTTP(rr, req)
-
-	if status := rr.Code; status != http.StatusBadRequest {
-		t.Errorf("Expected 400 for missing public_key, got %v", status)
 	}
 }
 
@@ -285,7 +274,7 @@ func TestGetRoomMembers(t *testing.T) {
 			if roomID != "room-1" {
 				t.Errorf("Expected roomID 'room-1', got %s", roomID)
 			}
-			return []*RoomMember{{UserID: "u1", PublicKey: "key1"}}, nil
+			return []*RoomMember{{UserID: "u1"}}, nil
 		},
 	}
 	srv := NewServer(mockDB, nil)
@@ -429,12 +418,12 @@ func TestSendMessageError(t *testing.T) {
 
 func TestUpdateProfileError(t *testing.T) {
 	mockDB := &MockDB{
-		UpdateProfileFn: func(ctx context.Context, userID, displayName, publicKey string) error {
+		UpdateProfileFn: func(ctx context.Context, userID, displayName string) error {
 			return fmt.Errorf("DB error")
 		},
 	}
 	srv := NewServer(mockDB, nil)
-	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "error", "public_key": "error"}`))
+	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "error"}`))
 	token, _ := GenerateToken("test-user")
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()

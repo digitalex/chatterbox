@@ -42,20 +42,18 @@ type MsgResult struct {
 // Update ProfileReq
 type ProfileReq struct {
 	DisplayName string `json:"display_name"`
-	PublicKey   string `json:"public_key"` // New field
 }
 
 // Add a Response struct for the new endpoint
 type RoomMember struct {
     UserID    string `json:"user_id"`
-    PublicKey string `json:"public_key"`
 }
 
 // Database interface abstracts the data store interactions
 type Database interface {
 	HealthCheck(ctx context.Context) (int64, error)
 	CreateRoom(ctx context.Context, roomID string, name string, userID string) error
-	UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error
+	UpdateProfile(ctx context.Context, userID string, displayName string) error
 	GetRoomMembers(ctx context.Context, roomID string) ([]*RoomMember, error)
 	SendMessage(ctx context.Context, roomID string, userID string, msgID int64, content interface{}) error
 	Sync(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error)

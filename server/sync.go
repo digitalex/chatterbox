@@ -63,12 +63,12 @@ func (s *Server) updateProfileHandler(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-	if req.DisplayName == "" || req.PublicKey == "" {
+	if req.DisplayName == "" {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
-    err := s.db.UpdateProfile(ctx, userID, req.DisplayName, req.PublicKey)
+    err := s.db.UpdateProfile(ctx, userID, req.DisplayName)
     if err != nil {
         http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
         return

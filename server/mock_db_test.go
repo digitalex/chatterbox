@@ -8,7 +8,7 @@ import (
 type MockDB struct {
 	HealthCheckFn    func(ctx context.Context) (int64, error)
 	CreateRoomFn     func(ctx context.Context, roomID string, name string, userID string) error
-	UpdateProfileFn  func(ctx context.Context, userID string, displayName string, publicKey string) error
+	UpdateProfileFn  func(ctx context.Context, userID string, displayName string) error
 	GetRoomMembersFn func(ctx context.Context, roomID string) ([]*RoomMember, error)
 	SendMessageFn    func(ctx context.Context, roomID string, userID string, msgID int64, content interface{}) error
 	SyncFn           func(ctx context.Context, userID string, lastSync time.Time) ([]*RoomResult, []*MsgResult, []*UserResult, error)
@@ -28,9 +28,9 @@ func (m *MockDB) CreateRoom(ctx context.Context, roomID string, name string, use
 	return nil
 }
 
-func (m *MockDB) UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error {
+func (m *MockDB) UpdateProfile(ctx context.Context, userID string, displayName string) error {
 	if m.UpdateProfileFn != nil {
-		return m.UpdateProfileFn(ctx, userID, displayName, publicKey)
+		return m.UpdateProfileFn(ctx, userID, displayName)
 	}
 	return nil
 }
