@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { USER_ID, API_URL, getAuthToken } from './sync';
+import { USER_ID, API_URL, getAuthToken, setAuthInfo, clearAuthInfo } from './sync';
 
 // Define what our "User" looks like
 interface User {
@@ -9,12 +9,23 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (name: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+function parseJwt(token: string) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = atob(base64);
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        return null;
+    }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -22,35 +33,67 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Check Local Storage on mount (Auto-Login)
   useEffect(() => {
-    const savedName = localStorage.getItem('chatterbox_username');
-    if (savedName && USER_ID) {
-      setUser({ id: USER_ID, name: savedName });
-    }
-    setIsLoading(false);
+    const checkAuth = async () => {
+        try {
+            const token = await getAuthToken(); // Throws if missing
+            const userId = USER_ID;
+
+            // Validate token expiry
+            const decoded = parseJwt(token);
+            if (decoded && decoded.exp * 1000 > Date.now()) {
+                 const savedName = localStorage.getItem('chatterbox_username') || "User";
+                 if (userId) {
+                    setUser({ id: userId, name: savedName });
+                 }
+            } else {
+                // Token expired
+                logout();
+            }
+        } catch (e) {
+            // Not logged in
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    checkAuth();
   }, []);
 
   // 2. Login Function
-  const login = async (name: string) => {
-    // Save to server (so other users see the name)
-    const token = await getAuthToken();
-    await fetch(`${API_URL}/me`, {
+  const login = async (username: string, password: string) => {
+    const response = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ display_name: name }),
+      body: JSON.stringify({ username, password }),
     });
 
+    if (!response.ok) {
+        throw new Error('Invalid credentials');
+    }
+
+    const data = await response.json();
+    const token = data.token;
+
+    // Decode token to get user_id
+    const decoded = parseJwt(token);
+    if (!decoded || !decoded.user_id) {
+        throw new Error('Invalid token received');
+    }
+
+    const userId = decoded.user_id;
+
     // Save locally
-    localStorage.setItem('chatterbox_username', name);
+    setAuthInfo(userId, token);
+    localStorage.setItem('chatterbox_username', username);
     
     // Update State
-    setUser({ id: USER_ID, name: name });
+    setUser({ id: userId, name: username });
   };
 
-  // 3. Logout Function (Optional, but good for testing)
+  // 3. Logout Function
   const logout = () => {
+    clearAuthInfo();
     localStorage.removeItem('chatterbox_username');
     setUser(null);
   };

@@ -2,11 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider, useAuth } from '../AuthContext';
-import { USER_ID, API_URL } from '../sync';
+import { API_URL, setAuthInfo, clearAuthInfo } from '../sync';
 
 // Mock fetch
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
+
+// Mock Token (valid until year 2286)
+// Header: {"alg":"HS256","typ":"JWT"} -> eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
+// Payload: {"user_id":"test-user-id","exp":9999999999} -> eyJ1c2VyX2lkIjoidGVzdC11c2VyLWlkIiwiZXhwIjo5OTk5OTk5OTk5fQ
+const MOCK_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidGVzdC11c2VyLWlkIiwiZXhwIjo5OTk5OTk5OTk5fQ.signature";
+const MOCK_USER_ID = "test-user-id";
 
 // Test component to consume the context
 const TestComponent = () => {
@@ -22,7 +28,7 @@ const TestComponent = () => {
           <button onClick={logout}>Logout</button>
         </>
       ) : (
-        <button onClick={() => login('Test User')}>Login</button>
+        <button onClick={() => login('testuser', 'password')}>Login</button>
       )}
     </div>
   );
@@ -31,7 +37,8 @@ const TestComponent = () => {
 describe('AuthContext', () => {
   beforeEach(() => {
     fetchMock.mockReset();
-    localStorage.clear();
+    clearAuthInfo(); // Clears sync.ts state and localStorage
+    vi.resetModules();
   });
 
   afterEach(() => {
@@ -49,7 +56,8 @@ describe('AuthContext', () => {
     expect(screen.queryByTestId('user-info')).not.toBeInTheDocument();
   });
 
-  it('should initialize with user if localStorage has username', async () => {
+  it('should initialize with user if localStorage has valid token', async () => {
+    setAuthInfo(MOCK_USER_ID, MOCK_TOKEN);
     localStorage.setItem('chatterbox_username', 'Saved User');
 
     render(
@@ -58,21 +66,15 @@ describe('AuthContext', () => {
       </AuthProvider>
     );
 
-    expect(await screen.findByTestId('user-info')).toHaveTextContent(`Saved User (${USER_ID})`);
+    expect(await screen.findByTestId('user-info')).toHaveTextContent(`Saved User (${MOCK_USER_ID})`);
     expect(screen.queryByText('Login')).not.toBeInTheDocument();
   });
 
   it('should login successfully', async () => {
-    // 1. Mock Login (getAuthToken)
+    // 1. Mock /login call
     fetchMock.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ token: 'mock-token' }),
-    });
-
-    // 2. Mock /me call
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
+        json: async () => ({ token: MOCK_TOKEN }),
     });
 
     render(
@@ -88,24 +90,15 @@ describe('AuthContext', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(1, `${API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID }),
+        body: JSON.stringify({ username: 'testuser', password: 'password' }),
     });
 
-    // Verify /me called
-    expect(fetchMock).toHaveBeenNthCalledWith(2, `${API_URL}/me`, {
-      method: 'POST',
-      headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer mock-token'
-      },
-      body: JSON.stringify({ display_name: 'Test User' }),
-    });
-
-    expect(localStorage.getItem('chatterbox_username')).toBe('Test User');
-    expect(await screen.findByTestId('user-info')).toHaveTextContent(`Test User (${USER_ID})`);
+    expect(localStorage.getItem('chatterbox_username')).toBe('testuser');
+    expect(await screen.findByTestId('user-info')).toHaveTextContent(`testuser (${MOCK_USER_ID})`);
   });
 
   it('should logout successfully', async () => {
+    setAuthInfo(MOCK_USER_ID, MOCK_TOKEN);
     localStorage.setItem('chatterbox_username', 'Saved User');
 
     render(
@@ -118,6 +111,7 @@ describe('AuthContext', () => {
     await userEvent.click(logoutButton);
 
     expect(localStorage.getItem('chatterbox_username')).toBeNull();
+    expect(localStorage.getItem('chatterbox_auth_token')).toBeNull();
     expect(await screen.findByText('Login')).toBeInTheDocument();
   });
 });
