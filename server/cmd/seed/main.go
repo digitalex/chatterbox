@@ -34,8 +34,8 @@ func main() {
 	mutations := []*spanner.Mutation{
 		// A. User
 		spanner.InsertOrUpdate("Users",
-			[]string{"UserId", "Email", "PublicKey", "CreatedAt"},
-			[]interface{}{userID, "alice@example.com", "dummy-public-key-base64", spanner.CommitTimestamp},
+			[]string{"UserId", "Email", "CreatedAt"},
+			[]interface{}{userID, "alice@example.com", spanner.CommitTimestamp},
 		),
 		
 		// B. Room

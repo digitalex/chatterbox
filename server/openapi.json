@@ -322,9 +322,6 @@
         "properties": {
           "display_name": {
             "type": "string"
-          },
-          "public_key": {
-            "type": "string"
           }
         }
       },
@@ -332,9 +329,6 @@
         "type": "object",
         "properties": {
           "user_id": {
-            "type": "string"
-          },
-          "public_key": {
             "type": "string"
           }
         }
