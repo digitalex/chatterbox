@@ -38,7 +38,7 @@ export function ProfileSettingsModal({ onClose }: ProfileSettingsModalProps) {
     setIsSubmitting(true);
 
     try {
-      const token = getAuthToken();
+      const token = await getAuthToken();
       const res = await fetch(`${API_URL}/me`, {
         method: 'POST',
         headers: {
@@ -75,7 +75,7 @@ export function ProfileSettingsModal({ onClose }: ProfileSettingsModalProps) {
     setIsSubmitting(true);
 
     try {
-      const token = getAuthToken();
+      const token = await getAuthToken();
       const res = await fetch(`${API_URL}/change-password`, {
         method: 'POST',
         headers: {

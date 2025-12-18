@@ -121,4 +121,21 @@ func TestAuthHandlers(t *testing.T) {
 			t.Errorf("Expected 401, got %d", w.Code)
 		}
 	})
+
+	t.Run("Change Password - Extra Spaces in Header", func(t *testing.T) {
+		userToken, _ := GenerateToken("user-id", false)
+
+		reqBody := ChangePasswordReq{OldPassword: "oldpassword", NewPassword: "newpassword"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/change-password", bytes.NewBuffer(body))
+		// Note double space
+		req.Header.Set("Authorization", "Bearer  "+userToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Errorf("Expected 200, got %d, body: %s", w.Code, w.Body.String())
+		}
+	})
 }
