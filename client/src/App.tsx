@@ -150,7 +150,10 @@ function ChatRoom({ roomId, onBack }: ChatRoomProps) {
       await sendMessage(roomId, { text: textToSend });
     };
 
-    const roomName = useLiveQuery(() => db.rooms.get(roomId))?.name || 'Chat';
+    const roomName = useLiveQuery(
+      () => db.rooms.get(roomId),
+      [roomId]
+    )?.name || 'Chat';
   
     return (
       <div className="room-view">
