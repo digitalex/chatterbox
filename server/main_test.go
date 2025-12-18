@@ -143,9 +143,9 @@ func TestSyncUnauthorized(t *testing.T) {
 
 func TestUpdateProfile(t *testing.T) {
 	mockDB := &MockDB{
-		UpdateProfileFn: func(ctx context.Context, userID string, displayName string, publicKey string) error {
-			if displayName != "New Name" {
-				t.Errorf("Expected DisplayName 'New Name', got %s", displayName)
+		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
+			if displayName == nil || *displayName != "New Name" {
+				t.Errorf("Expected DisplayName 'New Name', got %v", displayName)
 			}
 			return nil
 		},
@@ -278,7 +278,7 @@ func TestSyncError(t *testing.T) {
 
 func TestUpdateProfileError(t *testing.T) {
 	mockDB := &MockDB{
-		UpdateProfileFn: func(ctx context.Context, userID, displayName, publicKey string) error {
+		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
 			return fmt.Errorf("DB error")
 		},
 	}

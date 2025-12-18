@@ -6,6 +6,7 @@ import { syncData, sendMessage, createRoom, USER_ID } from './sync';
 import { Login } from './Login';
 import { AuthProvider, useAuth } from './AuthContext';
 import { CreateRoomModal } from './CreateRoomModal';
+import { ProfileSettingsModal } from './ProfileSettingsModal';
 import './App.css';
 
 // --- ICONS (Inline SVGs) ---
@@ -30,12 +31,16 @@ const SendIcon = () => (
 const CheckIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#999" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
 );
+const SettingsIcon = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+);
 
 // 1. Main Component
 function ChatterboxApp() {
   const { user, isLoading } = useAuth();
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [isNewRoomModalOpen, setIsNewRoomModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   useEffect(() => {
     syncData();
@@ -64,6 +69,9 @@ function ChatterboxApp() {
           onClose={() => setIsNewRoomModalOpen(false)}
           onCreate={handleCreateRoom}
         />
+      )}
+      {isProfileModalOpen && (
+        <ProfileSettingsModal onClose={() => setIsProfileModalOpen(false)} />
       )}
       <aside className={sidebarClass}>
         <div className="sidebar-header">
@@ -98,6 +106,13 @@ function ChatterboxApp() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="sidebar-footer" style={{ marginTop: 'auto', padding: '16px', borderTop: '1px solid #EEE' }}>
+            <button className="settings-btn" onClick={() => setIsProfileModalOpen(true)} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <SettingsIcon />
+                <span>Settings</span>
+            </button>
         </div>
       </aside>
 

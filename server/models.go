@@ -55,8 +55,8 @@ type MsgResult struct {
 
 // Update ProfileReq
 type ProfileReq struct {
-	DisplayName string `json:"display_name"`
-	PublicKey   string `json:"public_key"` // New field
+	DisplayName *string `json:"display_name"`
+	PublicKey   *string `json:"public_key"` // New field
 }
 
 // Add a Response struct for the new endpoint
@@ -81,7 +81,7 @@ type ChangePasswordReq struct {
 // Database interface abstracts the data store interactions
 type Database interface {
 	HealthCheck(ctx context.Context) (int64, error)
-	UpdateProfile(ctx context.Context, userID string, displayName string, publicKey string) error
+	UpdateProfile(ctx context.Context, userID string, displayName *string, publicKey *string) error
 	GetRoomMembers(ctx context.Context, roomID string) ([]*RoomMember, error)
 	Sync(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error)
 
