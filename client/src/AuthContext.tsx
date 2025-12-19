@@ -5,6 +5,7 @@ import { USER_ID, API_URL, getAuthToken, setAuthInfo, clearAuthInfo } from './sy
 interface User {
   id: string;
   name: string;
+  is_admin: boolean;
 }
 
 interface AuthContextType {
@@ -42,8 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const decoded = parseJwt(token);
             if (decoded && decoded.exp * 1000 > Date.now()) {
                  const savedName = localStorage.getItem('chatterbox_username') || "User";
+                 const isAdmin = decoded.is_admin || false;
                  if (userId) {
-                    setUser({ id: userId, name: savedName });
+                    setUser({ id: userId, name: savedName, is_admin: isAdmin });
                  }
             } else {
                 // Token expired
@@ -82,13 +84,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const userId = decoded.user_id;
+    const isAdmin = decoded.is_admin || false;
 
     // Save locally
     setAuthInfo(userId, token);
     localStorage.setItem('chatterbox_username', username);
     
     // Update State
-    setUser({ id: userId, name: username });
+    setUser({ id: userId, name: username, is_admin: isAdmin });
   };
 
   // 3. Logout Function
