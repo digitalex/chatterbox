@@ -119,7 +119,7 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
@@ -151,8 +151,8 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+	if req.Username == "" || req.Password == "" || req.DisplayName == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
