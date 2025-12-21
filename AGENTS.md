@@ -18,7 +18,7 @@
 
 * **Framework:** React 19+ (TypeScript), Vite.
 * **State/Storage:** `dexie` (IndexedDB wrapper) and `dexie-react-hooks`.
-* **Styling:** Custom CSS (`App.css`). No Tailwind/Bootstrap. Dark mode is default.
+* **Styling:** Custom CSS (`App.css`). No Tailwind/Bootstrap. Light mode is default.
 * **Routing:** Custom state-based routing (Room ID tracking).
 
 ### Backend
@@ -74,6 +74,8 @@ Used for **Authentication & Profile Management**.
 2. Server validates credentials against `Users` table.
 3. Server returns JWT Token.
 4. Client stores token and triggers **Sync Loop** to fetch user data and rooms.
+
+* **Other Endpoints:** `POST /api/me` (Update Profile), `POST /api/change-password`, `POST /api/users` (Admin Create).
 
 
 ---

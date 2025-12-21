@@ -13,8 +13,8 @@ Chatterbox is a fully open source, free, and secure chat application. It is desi
 
 Chatterbox uses a username/password authentication system.
 
--   **Login:** Users log in via the client to receive a JWT.
--   **Registration:** Currently, user creation is restricted to Administrators via the API.
+-   **Login:** Users log in via the client to receive a JWT (`POST /api/login`).
+-   **Registration:** Currently, user creation is restricted to Administrators via the API (`POST /api/users`).
 -   **Security:** Passwords are salted and hashed using bcrypt.
 
 ## Architecture
