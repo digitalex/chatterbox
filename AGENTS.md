@@ -18,7 +18,7 @@
 
 * **Framework:** React 19+ (TypeScript), Vite.
 * **State/Storage:** `dexie` (IndexedDB wrapper) and `dexie-react-hooks`.
-* **Styling:** Custom CSS (`App.css`). No Tailwind/Bootstrap. Dark mode is default.
+* **Styling:** Custom CSS (`App.css`). No Tailwind/Bootstrap. Light mode is default.
 * **Routing:** Custom state-based routing (Room ID tracking).
 
 ### Backend
@@ -43,9 +43,7 @@ See `server/spanner-schema.sql` for the most up to date schema definition.
 
 The client mirrors the server schema but adds synchronization flags.
 
-* **`rooms`**: `room_id, name, created_at, synced (0|1)`
-* **`messages`**: `[room_id+message_id], room_id, content, created_at, synced (0|1)` (Compound PK)
-* **`users`**: `user_id, display_name` (Read-only cache of directory)
+See `client/src/db.ts` for the most up to date schema definition.
 
 ---
 
