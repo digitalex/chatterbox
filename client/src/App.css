@@ -19,12 +19,14 @@ html, body, #root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--text-black);
   background-color: var(--bg-white);
+  overscroll-behavior: none; /* Prevent rubber-banding on mobile */
 }
 
 /* MAIN LAYOUT CONTAINER */
 .app-container {
   display: flex;
-  height: 100vh;
+  height: 100vh; /* Fallback for older browsers */
+  height: 100dvh; /* Mobile viewport height fix */
   width: 100vw;
   overflow: hidden;
   background-color: var(--bg-white);
@@ -186,8 +188,6 @@ html, body, #root {
   padding: 16px 24px;
   border-bottom: 1px solid var(--border-light);
   background: white;
-  position: sticky;
-  top: 0;
   z-index: 10;
 }
 
@@ -350,8 +350,6 @@ html, body, #root {
   align-items: center;
   gap: 12px;
   background: white;
-  position: sticky;
-  bottom: 0;
   z-index: 10;
 }
 
