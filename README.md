@@ -56,8 +56,9 @@ The server is responsible for syncing messages and rooms. It connects to Google 
     export GOOGLE_CLOUD_PROJECT=your-project-id
     export SPANNER_DATABASE=your-database-id
     ```
-    *(Optional) Set a custom port (default is 8080):*
+    *(Optional) Set a secure JWT secret (defaults to dev secret) and custom port (default 8080):*
     ```bash
+    export JWT_SECRET=your-secure-secret
     export PORT=8080
     ```
 
