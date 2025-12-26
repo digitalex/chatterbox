@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
 import { db } from './db';
@@ -182,6 +182,16 @@ function ChatRoom({ roomId, onBack }: ChatRoomProps) {
       () => db.rooms.get(roomId),
       [roomId]
     )?.name || 'Chat';
+
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+      scrollToBottom();
+    }, [messages]);
   
     return (
       <div className="room-view">
@@ -226,6 +236,7 @@ function ChatRoom({ roomId, onBack }: ChatRoomProps) {
               </div>
             );
           })}
+          <div ref={messagesEndRef} />
         </div>
 
         <div className="composer-container">
