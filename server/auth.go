@@ -125,7 +125,12 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	userID, isAdmin, err := s.db.AuthenticateUser(r.Context(), req.Username, req.Password)
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		// Distinguish between invalid creds and internal error
+		if strings.Contains(err.Error(), "invalid credentials") || strings.Contains(err.Error(), "invalid password") {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		} else {
+			http.Error(w, "Internal DB Error", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -151,8 +156,9 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+	// Added check for DisplayName
+	if req.Username == "" || req.Password == "" || req.DisplayName == "" {
+		http.Error(w, "Username, Password, and DisplayName are required", http.StatusBadRequest)
 		return
 	}
 
@@ -186,7 +192,12 @@ func (s *Server) changePasswordHandler(w http.ResponseWriter, r *http.Request) {
 
 	if req.OldPassword != "" {
 		if err := s.db.VerifyPassword(r.Context(), userID, req.OldPassword); err != nil {
-			http.Error(w, "Invalid old password", http.StatusUnauthorized)
+			// Distinguish specific auth error
+			if strings.Contains(err.Error(), "invalid password") || strings.Contains(err.Error(), "user not found") {
+				http.Error(w, "Invalid old password", http.StatusUnauthorized)
+			} else {
+				http.Error(w, "Internal DB Error", http.StatusInternalServerError)
+			}
 			return
 		}
 	} else {
