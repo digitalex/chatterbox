@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
@@ -57,6 +58,26 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	var req SyncRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		// If body is empty, assume clean sync (req is zero-valued)
+		// But explicit error on malformed JSON? OpenAPI says required.
+		// Let's return error if decode failed and body wasn't empty
+		if err != io.EOF {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Validate nested objects (basic check)
+	for _, r := range req.Rooms {
+		if r.RoomID == "" || r.Name == "" {
+			http.Error(w, "Invalid room data", http.StatusBadRequest)
+			return
+		}
+	}
+	for _, m := range req.Messages {
+		if m.RoomID == "" || m.MessageID == 0 {
+			http.Error(w, "Invalid message data", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Default to "beginning of time" if no timestamp provided

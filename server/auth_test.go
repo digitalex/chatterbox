@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestAuthHandlers(t *testing.T) {
@@ -28,7 +31,7 @@ func TestAuthHandlers(t *testing.T) {
 			if password == "oldpassword" {
 				return nil
 			}
-			return http.ErrNoCookie // Just an error
+			return status.Error(codes.Unauthenticated, "invalid password")
 		},
 		UpdatePasswordFn: func(ctx context.Context, userID, newPassword string) error {
 			return nil
