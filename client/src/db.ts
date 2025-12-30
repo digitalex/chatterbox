@@ -48,6 +48,11 @@ class ChatDatabase extends Dexie {
       users: 'user_id'
     });
 
+    // Add version 4 for [room_id+created_at] compound index
+    this.version(4).stores({
+      messages: '[room_id+message_id], [room_id+created_at], room_id, created_at, synced'
+    });
+
     // Backward compatibility for v2 (if needed, but usually we just append versions)
     this.version(2).stores({
       rooms: 'room_id',
