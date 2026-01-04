@@ -149,6 +149,46 @@ func TestSyncUnauthorized(t *testing.T) {
 	}
 }
 
+func TestSyncMissingFields(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+	token, _ := GenerateToken("test-user", false)
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "Missing room_id in rooms",
+			body: `{"rooms": [{"name": "Room"}]}`,
+		},
+		{
+			name: "Missing name in rooms",
+			body: `{"rooms": [{"room_id": "r1"}]}`,
+		},
+		{
+			name: "Missing room_id in messages",
+			body: `{"messages": [{"message_id": 1}]}`,
+		},
+		{
+			name: "Missing message_id in messages",
+			body: `{"messages": [{"room_id": "r1"}]}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(tt.body))
+			req.Header.Set("Authorization", "Bearer "+token)
+			rr := httptest.NewRecorder()
+			srv.router.ServeHTTP(rr, req)
+
+			if status := rr.Code; status != http.StatusBadRequest {
+				t.Errorf("Expected 400 for %s, got %d", tt.name, status)
+			}
+		})
+	}
+}
+
 func TestUpdateProfile(t *testing.T) {
 	mockDB := &MockDB{
 		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {

@@ -56,7 +56,22 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	// 2. Parse Request Body
 	var req SyncRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// If body is empty, assume clean sync (req is zero-valued)
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate required fields in nested objects
+	for _, room := range req.Rooms {
+		if room.RoomID == "" || room.Name == "" {
+			http.Error(w, "Missing required fields in rooms", http.StatusBadRequest)
+			return
+		}
+	}
+	for _, msg := range req.Messages {
+		if msg.RoomID == "" || msg.MessageID == 0 {
+			http.Error(w, "Missing required fields in messages", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Default to "beginning of time" if no timestamp provided

@@ -119,7 +119,7 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+		http.Error(w, "Missing username or password", http.StatusBadRequest)
 		return
 	}
 
@@ -151,8 +151,8 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+	if req.Username == "" || req.Password == "" || req.DisplayName == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
@@ -179,19 +179,13 @@ func (s *Server) changePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.NewPassword == "" {
-		http.Error(w, "New password is required", http.StatusBadRequest)
+	if req.OldPassword == "" || req.NewPassword == "" {
+		http.Error(w, "Missing or invalid fields", http.StatusBadRequest)
 		return
 	}
 
-	if req.OldPassword != "" {
-		if err := s.db.VerifyPassword(r.Context(), userID, req.OldPassword); err != nil {
-			http.Error(w, "Invalid old password", http.StatusUnauthorized)
-			return
-		}
-	} else {
-		// Enforce old password check
-		http.Error(w, "Old password is required", http.StatusBadRequest)
+	if err := s.db.VerifyPassword(r.Context(), userID, req.OldPassword); err != nil {
+		http.Error(w, "Invalid old password", http.StatusUnauthorized)
 		return
 	}
 
