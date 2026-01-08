@@ -65,8 +65,8 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
           <p>Are you sure you want to delete <strong>{room.name}</strong>? This cannot be undone.</p>
           {error && <p className="error-message">{error}</p>}
           <div className="modal-actions">
-            <button onClick={() => setIsDeleteConfirmOpen(false)} className="cancel-btn">Cancel</button>
-            <button onClick={handleDelete} className="delete-btn" style={{backgroundColor: 'red', color: 'white'}}>Delete</button>
+            <button onClick={() => setIsDeleteConfirmOpen(false)} className="btn-cancel">Cancel</button>
+            <button onClick={handleDelete} className="btn-danger">Delete</button>
           </div>
         </div>
       </div>
@@ -94,8 +94,8 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
              <button
                onClick={handleRename}
                disabled={!isNameChanged}
-               className="primary-btn"
-               style={{ opacity: isNameChanged ? 1 : 0.5, cursor: isNameChanged ? 'pointer' : 'not-allowed' }}
+               className="btn-primary"
+               style={{ opacity: isNameChanged ? 1 : 0.5, cursor: isNameChanged ? 'pointer' : 'not-allowed', width: 'auto' }}
              >
                Rename
              </button>
@@ -104,8 +104,8 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
           <div className="delete-row">
             <button
               onClick={() => setIsDeleteConfirmOpen(true)}
-              className="delete-btn"
-              style={{ width: '100%', backgroundColor: 'red', color: 'white' }}
+              className="btn-danger"
+              style={{ width: '100%' }}
             >
               Delete room
             </button>
@@ -114,7 +114,7 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
         </div>
 
         <div className="modal-actions" style={{ marginTop: '20px' }}>
-          <button onClick={onClose} className="cancel-btn">Close</button>
+          <button onClick={onClose} className="btn-cancel">Close</button>
         </div>
       </div>
     </div>
