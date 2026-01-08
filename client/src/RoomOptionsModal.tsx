@@ -11,7 +11,6 @@ interface RoomOptionsModalProps {
 
 export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOptionsModalProps) {
   const { user } = useAuth();
-  const [isRenameMode, setIsRenameMode] = useState(false);
   const [newName, setNewName] = useState(room.name);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,36 +73,49 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
     );
   }
 
+  const isNameChanged = newName.trim() !== room.name && newName.trim() !== "";
+
   return (
     <div className="modal-overlay">
       <div className="modal-content">
         <h2>Room Options</h2>
         {error && <p className="error-message">{error}</p>}
 
-        {!isRenameMode ? (
-          <div className="modal-options">
-            <button onClick={() => setIsRenameMode(true)} className="option-btn">Rename Room</button>
-            <button onClick={() => setIsDeleteConfirmOpen(true)} className="option-btn delete-option" style={{color: 'red'}}>Delete Room</button>
-          </div>
-        ) : (
-          <div className="rename-form">
-            <input
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <div className="modal-actions">
-              <button onClick={() => setIsRenameMode(false)} className="cancel-btn">Back</button>
-              <button onClick={handleRename} className="save-btn">Save</button>
-            </div>
-          </div>
-        )}
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {!isRenameMode && (
-          <div className="modal-actions">
-            <button onClick={onClose} className="cancel-btn">Close</button>
+          <div className="rename-row" style={{ display: 'flex', gap: '10px' }}>
+             <input
+               type="text"
+               value={newName}
+               onChange={(e) => setNewName(e.target.value)}
+               className="modal-input"
+               style={{ flex: 1 }}
+             />
+             <button
+               onClick={handleRename}
+               disabled={!isNameChanged}
+               className="primary-btn"
+               style={{ opacity: isNameChanged ? 1 : 0.5, cursor: isNameChanged ? 'pointer' : 'not-allowed' }}
+             >
+               Rename
+             </button>
           </div>
-        )}
+
+          <div className="delete-row">
+            <button
+              onClick={() => setIsDeleteConfirmOpen(true)}
+              className="delete-btn"
+              style={{ width: '100%', backgroundColor: 'red', color: 'white' }}
+            >
+              Delete room
+            </button>
+          </div>
+
+        </div>
+
+        <div className="modal-actions" style={{ marginTop: '20px' }}>
+          <button onClick={onClose} className="cancel-btn">Close</button>
+        </div>
       </div>
     </div>
   );
