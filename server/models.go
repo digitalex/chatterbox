@@ -90,4 +90,8 @@ type Database interface {
 	VerifyPassword(ctx context.Context, userID, password string) error                     // Verifies password for userID
 	CreateUser(ctx context.Context, user CreateUserReq) (string, error)                    // Returns new UserID
 	UpdatePassword(ctx context.Context, userID, newPassword string) error
+
+	// Room Management
+	DeleteRoom(ctx context.Context, roomID string) error
+	RenameRoom(ctx context.Context, roomID, newName string) error
 }
