@@ -30,7 +30,7 @@ export function CreateUserModal({ onClose }: CreateUserModalProps) {
         body: JSON.stringify({
           username,
           password,
-          display_name: displayName || username,
+          display_name: displayName,
           is_admin: isAdmin
         })
       });
@@ -84,11 +84,12 @@ export function CreateUserModal({ onClose }: CreateUserModalProps) {
             </div>
 
             <div className="form-group">
-                <label>Display Name (Optional)</label>
+                <label>Display Name</label>
                 <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
+                required
                 />
             </div>
 
