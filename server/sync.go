@@ -68,6 +68,11 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 	// Capture "Now" to return as the next cursor
 	now := time.Now().UTC()
 
+	// Assign robust Snowflake IDs to new messages
+	for i := range req.Messages {
+		req.Messages[i].MessageID = GenerateID()
+	}
+
 	rooms, messages, users, err := s.db.Sync(ctx, userID, lastSync, req.Rooms, req.Messages)
     if err != nil {
         http.Error(w, "DB Error: "+err.Error(), http.StatusInternalServerError)
