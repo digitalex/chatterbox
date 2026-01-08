@@ -15,6 +15,10 @@ type MockDB struct {
 	VerifyPasswordFn   func(ctx context.Context, userID, password string) error
 	CreateUserFn       func(ctx context.Context, user CreateUserReq) (string, error)
 	UpdatePasswordFn   func(ctx context.Context, userID, newPassword string) error
+
+	// Room Management
+	DeleteRoomFn func(ctx context.Context, roomID string) error
+	RenameRoomFn func(ctx context.Context, roomID, newName string) error
 }
 
 func (m *MockDB) HealthCheck(ctx context.Context) (int64, error) {
@@ -27,6 +31,20 @@ func (m *MockDB) HealthCheck(ctx context.Context) (int64, error) {
 func (m *MockDB) UpdateProfile(ctx context.Context, userID string, displayName *string, publicKey *string) error {
 	if m.UpdateProfileFn != nil {
 		return m.UpdateProfileFn(ctx, userID, displayName, publicKey)
+	}
+	return nil
+}
+
+func (m *MockDB) DeleteRoom(ctx context.Context, roomID string) error {
+	if m.DeleteRoomFn != nil {
+		return m.DeleteRoomFn(ctx, roomID)
+	}
+	return nil
+}
+
+func (m *MockDB) RenameRoom(ctx context.Context, roomID, newName string) error {
+	if m.RenameRoomFn != nil {
+		return m.RenameRoomFn(ctx, roomID, newName)
 	}
 	return nil
 }

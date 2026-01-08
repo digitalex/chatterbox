@@ -95,7 +95,7 @@ func (s *Server) routes() {
 			"https://chatterbox-480916.web.app", // Your Production Frontend
 			"https://chatterbox-480916.firebaseapp.com",
 		},
-		AllowedMethods:   []string{"GET", "POST", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		AllowCredentials: true,
 	}))
@@ -114,6 +114,8 @@ func (s *Server) routes() {
 		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
 		r.Post("/api/users", s.createUserHandler)
 		r.Post("/api/change-password", s.changePasswordHandler)
+		r.Delete("/api/rooms/{roomID}", s.deleteRoomHandler)
+		r.Put("/api/rooms/{roomID}", s.renameRoomHandler)
 	})
 }
 
