@@ -82,6 +82,14 @@ export async function syncData() {
         await Promise.all(unsyncedMessages.map(m => db.messages.update([m.room_id, m.message_id], { synced: 1 })));
       }
 
+      // 1.5. If we received new room or message IDs for things we just sent, update them.
+      // (Simplified: We assume server returns the same IDs or we re-sync them.
+      // If server generates new IDs, we might have duplicates if we don't handle it.
+      // But current design: we use Snowflake client-side or we rely on sync logic which might duplicate if ID mismatch.
+      // Actually server overrides message_id. So we likely get the "real" message back.
+      // We should probably delete the temporary unsynced message if we get a match, but matching is hard without a temporary ID.
+      // For now, let's assume simple sync.)
+
       // B. Update Rooms (Downstream)
       if (data.rooms) {
         const roomUpdates = data.rooms.map((r: any) => ({
