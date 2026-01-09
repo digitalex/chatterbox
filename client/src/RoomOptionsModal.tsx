@@ -12,12 +12,16 @@ interface RoomOptionsModalProps {
 export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOptionsModalProps) {
   const { user } = useAuth();
   const [newName, setNewName] = useState(room.name);
+  const [username, setUsername] = useState("");
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   if (!user?.is_admin) return null;
 
   const handleRename = async () => {
+    setError(null);
+    setSuccess(null);
     try {
       const token = await getAuthToken();
       const res = await fetch(`${API_URL}/rooms/${room.room_id}`, {
@@ -33,6 +37,34 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
 
       onUpdate();
       onClose();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const handleAddMember = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!username.trim()) return;
+
+    try {
+      const token = await getAuthToken();
+      const res = await fetch(`${API_URL}/rooms/${room.room_id}/members`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ username: username.trim() })
+      });
+
+      if (res.status === 404) throw new Error('User not found');
+      if (res.status === 409) throw new Error('User already in room');
+      if (!res.ok) throw new Error('Failed to add user');
+
+      setSuccess(`Added ${username} to room`);
+      setUsername("");
+      onUpdate();
     } catch (err: any) {
       setError(err.message);
     }
@@ -80,6 +112,7 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
       <div className="modal-content">
         <h2>Room Options</h2>
         {error && <p className="error-message">{error}</p>}
+        {success && <p className="success-message" style={{ color: 'green' }}>{success}</p>}
 
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -99,6 +132,25 @@ export function RoomOptionsModal({ room, onClose, onUpdate, onDelete }: RoomOpti
              >
                Rename
              </button>
+          </div>
+
+          <div className="add-member-row" style={{ display: 'flex', gap: '10px' }}>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Username to add"
+              className="modal-input"
+              style={{ flex: 1 }}
+            />
+            <button
+              onClick={handleAddMember}
+              disabled={!username.trim()}
+              className="btn-primary"
+              style={{ opacity: username.trim() ? 1 : 0.5, cursor: username.trim() ? 'pointer' : 'not-allowed', width: 'auto' }}
+            >
+              Add User
+            </button>
           </div>
 
           <div className="delete-row">
