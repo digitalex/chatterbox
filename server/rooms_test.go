@@ -53,6 +53,31 @@ func TestDeleteRoomHandler(t *testing.T) {
 
 		assert.Equal(t, http.StatusForbidden, rr.Code)
 	})
+
+	t.Run("InternalServerError", func(t *testing.T) {
+		roomID := "room123"
+
+		mockDB.DeleteRoomFn = func(ctx context.Context, id string) error {
+			assert.Equal(t, roomID, id)
+			return http.ErrHandlerTimeout // Just an error
+		}
+
+		req, _ := http.NewRequest("DELETE", "/api/rooms/"+roomID, nil)
+		// Inject admin user
+		ctx := context.WithValue(req.Context(), userIDKey, "admin-user")
+		ctx = context.WithValue(ctx, isAdminKey, true)
+		req = req.WithContext(ctx)
+
+		// Create chi context with URL param
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("roomID", roomID)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rr := httptest.NewRecorder()
+		server.deleteRoomHandler(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
+	})
 }
 
 func TestRenameRoomHandler(t *testing.T) {
@@ -120,5 +145,34 @@ func TestRenameRoomHandler(t *testing.T) {
 		server.renameRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
+	})
+
+	t.Run("InternalServerError", func(t *testing.T) {
+		roomID := "room123"
+		newName := "New Name"
+
+		mockDB.RenameRoomFn = func(ctx context.Context, id, name string) error {
+			assert.Equal(t, roomID, id)
+			assert.Equal(t, newName, name)
+			return http.ErrHandlerTimeout // Just an error
+		}
+
+		body, _ := json.Marshal(map[string]string{"name": newName})
+		req, _ := http.NewRequest("PUT", "/api/rooms/"+roomID, bytes.NewBuffer(body))
+
+		// Inject admin user
+		ctx := context.WithValue(req.Context(), userIDKey, "admin-user")
+		ctx = context.WithValue(ctx, isAdminKey, true)
+		req = req.WithContext(ctx)
+
+		// Create chi context with URL param
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("roomID", roomID)
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rr := httptest.NewRecorder()
+		server.renameRoomHandler(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
 }
