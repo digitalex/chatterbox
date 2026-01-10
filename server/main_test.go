@@ -149,6 +149,46 @@ func TestSyncUnauthorized(t *testing.T) {
 	}
 }
 
+func TestSyncBadRequest(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`invalid-json`))
+	token, _ := GenerateToken("test-user", false)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
+func TestSyncFirstLoad(t *testing.T) {
+	mockDB := &MockDB{
+		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+			if !lastSync.IsZero() {
+				t.Errorf("Expected zero time for lastSync, got %v", lastSync)
+			}
+			return []*RoomResult{}, []*MsgResult{}, []*UserResult{}, nil
+		},
+	}
+	srv := NewServer(mockDB, nil)
+
+	reqBody := `{"last_synced_at": null}`
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
+	token, _ := GenerateToken("test-user", false)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+}
+
 func TestUpdateProfile(t *testing.T) {
 	mockDB := &MockDB{
 		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
@@ -224,6 +264,18 @@ func TestGetRoomMembers(t *testing.T) {
 	}
 	if members[0].PublicKey != "key1" {
 		t.Errorf("Expected PublicKey 'key1', got %s", members[0].PublicKey)
+	}
+}
+
+func TestGetRoomMembersUnauthorized(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+	req, _ := http.NewRequest("GET", "/api/rooms/r1/members", nil)
+	rr := httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusUnauthorized {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusUnauthorized)
 	}
 }
 
