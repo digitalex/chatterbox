@@ -19,7 +19,7 @@ func TestAuthHandlers(t *testing.T) {
 			if username == "user" && password == "userpass" {
 				return "user-id", false, nil
 			}
-			return "", false, nil // Error?
+			return "", false, http.ErrNoCookie // Simulate error
 		},
 		CreateUserFn: func(ctx context.Context, user CreateUserReq) (string, error) {
 			return "new-user-id", nil
@@ -58,6 +58,32 @@ func TestAuthHandlers(t *testing.T) {
 		}
 		// Verify strict JSON structure if possible, but map check is usually better for extra fields.
 		// For now, ensuring Token exists is good.
+	})
+
+	t.Run("Login Failure - Wrong Password", func(t *testing.T) {
+		reqBody := LoginRequest{Username: "admin", Password: "wrongpassword"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	t.Run("Login Bad Request - Missing Fields", func(t *testing.T) {
+		reqBody := LoginRequest{Username: ""}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
 	})
 
 	t.Run("Create User - Admin", func(t *testing.T) {
@@ -99,6 +125,24 @@ func TestAuthHandlers(t *testing.T) {
 
 		if w.Code != http.StatusForbidden {
 			t.Errorf("Expected 403, got %d", w.Code)
+		}
+	})
+
+	t.Run("Create User - Bad Request", func(t *testing.T) {
+		// Generate Admin Token
+		adminToken, _ := GenerateToken("admin-id", true)
+
+		// Missing password
+		reqBody := CreateUserReq{Username: "newuser", DisplayName: "New User"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
 		}
 	})
 
