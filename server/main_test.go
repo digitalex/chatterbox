@@ -291,6 +291,47 @@ func TestSyncError(t *testing.T) {
 	}
 }
 
+func TestSyncBadRequest(t *testing.T) {
+    srv := NewServer(&MockDB{}, nil)
+
+    // Invalid JSON
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{"rooms":`))
+	token, _ := GenerateToken("test-user", false)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("Expected 400 for invalid JSON, got %v", status)
+	}
+
+    // Invalid logical data (missing room name)
+    reqBody := `{
+		"rooms": [{"room_id": "r1", "name": ""}]
+	}`
+    req, _ = http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
+    req.Header.Set("Authorization", "Bearer "+token)
+    rr = httptest.NewRecorder()
+    srv.router.ServeHTTP(rr, req)
+
+    if status := rr.Code; status != http.StatusBadRequest {
+        t.Errorf("Expected 400 for missing room name, got %v", status)
+    }
+
+    // Invalid logical data (missing message room_id)
+    reqBody = `{
+		"messages": [{"message_id": 1}]
+	}`
+    req, _ = http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
+    req.Header.Set("Authorization", "Bearer "+token)
+    rr = httptest.NewRecorder()
+    srv.router.ServeHTTP(rr, req)
+
+    if status := rr.Code; status != http.StatusBadRequest {
+        t.Errorf("Expected 400 for missing message room_id, got %v", status)
+    }
+}
+
 func TestUpdateProfileError(t *testing.T) {
 	mockDB := &MockDB{
 		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
