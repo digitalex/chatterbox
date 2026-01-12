@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -121,13 +120,11 @@ func (s *Server) routes() {
 
 func (s *Server) cloudLoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Read body
-		var bodyBytes []byte
+		// Wrap body to capture it as it is read
+		var capturer *bodyCapturer
 		if r.Body != nil {
-			// Limit request body read to 1MB to prevent DoS
-			bodyBytes, _ = io.ReadAll(io.LimitReader(r.Body, 1024*1024))
-			r.Body.Close()
-			r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			capturer = newBodyCapturer(r.Body, 1024*1024) // 1MB limit
+			r.Body = capturer
 		}
 
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
@@ -135,6 +132,19 @@ func (s *Server) cloudLoggingMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(ww, r)
 
 		if ww.Status() >= 400 {
+			var bodyBytes []byte
+			if capturer != nil {
+				// We need to ensure we have the body. If the handler didn't read it,
+				// we read it now. If the handler read it partially, we read the rest.
+				// We only care about capturing up to the limit (1MB).
+				// We do NOT want to drain the entire body if it exceeds the limit, as that could cause DoS.
+				remainingToCapture := 1024*1024 - int64(capturer.buf.Len())
+				if remainingToCapture > 0 {
+					io.CopyN(io.Discard, capturer, remainingToCapture)
+				}
+				bodyBytes = capturer.GetBody()
+			}
+
 			// Log to Cloud Logging
 			if s.logger != nil {
 				// We log asynchronously to avoid blocking the response?
