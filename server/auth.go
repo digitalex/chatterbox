@@ -125,6 +125,10 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	userID, isAdmin, err := s.db.AuthenticateUser(r.Context(), req.Username, req.Password)
 	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	if userID == "" {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -153,6 +157,10 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	if req.Username == "" || req.Password == "" {
 		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+		return
+	}
+	if req.DisplayName == "" {
+		http.Error(w, "Display name is required", http.StatusBadRequest)
 		return
 	}
 

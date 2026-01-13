@@ -64,7 +64,7 @@ func TestAuthHandlers(t *testing.T) {
 		// Generate Admin Token
 		adminToken, _ := GenerateToken("admin-id", true)
 
-		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+adminToken)
