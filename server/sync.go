@@ -59,6 +59,20 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 		// If body is empty, assume clean sync (req is zero-valued)
 	}
 
+	// Validate Request
+	for _, room := range req.Rooms {
+		if room.RoomID == "" || room.Name == "" {
+			http.Error(w, "Room ID and Name are required", http.StatusBadRequest)
+			return
+		}
+	}
+	for _, msg := range req.Messages {
+		if msg.RoomID == "" || msg.MessageID == 0 {
+			http.Error(w, "Room ID and Message ID are required", http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Default to "beginning of time" if no timestamp provided
 	lastSync := time.Time{}
 	if req.LastSyncedAt != nil {
