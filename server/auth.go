@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
@@ -125,7 +127,12 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	userID, isAdmin, err := s.db.AuthenticateUser(r.Context(), req.Username, req.Password)
 	if err != nil {
-		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.Unauthenticated {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
@@ -179,19 +186,13 @@ func (s *Server) changePasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.NewPassword == "" {
-		http.Error(w, "New password is required", http.StatusBadRequest)
+	if req.NewPassword == "" || req.OldPassword == "" {
+		http.Error(w, "Old and new passwords are required", http.StatusBadRequest)
 		return
 	}
 
-	if req.OldPassword != "" {
-		if err := s.db.VerifyPassword(r.Context(), userID, req.OldPassword); err != nil {
-			http.Error(w, "Invalid old password", http.StatusUnauthorized)
-			return
-		}
-	} else {
-		// Enforce old password check
-		http.Error(w, "Old password is required", http.StatusBadRequest)
+	if err := s.db.VerifyPassword(r.Context(), userID, req.OldPassword); err != nil {
+		http.Error(w, "Invalid old password", http.StatusUnauthorized)
 		return
 	}
 
