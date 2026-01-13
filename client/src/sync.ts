@@ -83,7 +83,7 @@ export async function syncData() {
       }
 
       // B. Update Rooms (Downstream)
-      if (data.rooms) {
+      if (data.rooms && data.rooms.length > 0) {
         const roomUpdates = data.rooms.map((r: any) => ({
             room_id: r.room_id,
             name: r.name,
@@ -91,14 +91,25 @@ export async function syncData() {
             synced: 1
         }));
 
-        for (const r of roomUpdates) {
-            const existing = await db.rooms.get(r.room_id);
-            await db.rooms.put({
-                ...r,
-                created_at: existing?.created_at || new Date().toISOString(), // Fallback
-                unread_count: existing?.unread_count || 0
-            });
-        }
+        const roomIds = roomUpdates.map((r: { room_id: string }) => r.room_id);
+        const existingRooms = await db.rooms.bulkGet(roomIds);
+
+        // Map room_id to existing room for easy lookup
+        const existingMap = new Map<string, Room>();
+        existingRooms.forEach((r) => {
+          if (r) existingMap.set(r.room_id, r);
+        });
+
+        const roomsToPut = roomUpdates.map((r: any) => {
+          const existing = existingMap.get(r.room_id);
+          return {
+            ...r,
+            created_at: existing?.created_at || new Date().toISOString(),
+            unread_count: existing?.unread_count || 0
+          };
+        });
+
+        await db.rooms.bulkPut(roomsToPut);
       }
 
       // C. Insert Messages (Downstream)
