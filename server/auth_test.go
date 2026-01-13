@@ -19,7 +19,7 @@ func TestAuthHandlers(t *testing.T) {
 			if username == "user" && password == "userpass" {
 				return "user-id", false, nil
 			}
-			return "", false, nil // Error?
+			return "", false, ErrInvalidCredentials
 		},
 		CreateUserFn: func(ctx context.Context, user CreateUserReq) (string, error) {
 			return "new-user-id", nil
@@ -28,7 +28,7 @@ func TestAuthHandlers(t *testing.T) {
 			if password == "oldpassword" {
 				return nil
 			}
-			return http.ErrNoCookie // Just an error
+			return ErrInvalidPassword
 		},
 		UpdatePasswordFn: func(ctx context.Context, userID, newPassword string) error {
 			return nil
@@ -64,7 +64,7 @@ func TestAuthHandlers(t *testing.T) {
 		// Generate Admin Token
 		adminToken, _ := GenerateToken("admin-id", true)
 
-		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+adminToken)
@@ -89,7 +89,7 @@ func TestAuthHandlers(t *testing.T) {
 		// Generate User Token
 		userToken, _ := GenerateToken("user-id", false)
 
-		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+userToken)
