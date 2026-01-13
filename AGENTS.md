@@ -73,6 +73,8 @@ Used for **Authentication & Profile Management**.
 3. Server returns JWT Token.
 4. Client stores token and triggers **Sync Loop** to fetch user data and rooms.
 
+* **Other Endpoints:** `POST /api/me` (Update Profile), `POST /api/change-password`, `POST /api/users` (Admin Create).
+
 
 ---
 
