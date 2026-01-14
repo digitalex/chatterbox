@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -52,6 +53,28 @@ func TestDeleteRoomHandler(t *testing.T) {
 		server.deleteRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusForbidden, rr.Code)
+	})
+
+	t.Run("Internal Error", func(t *testing.T) {
+		mockDB.DeleteRoomFn = func(ctx context.Context, id string) error {
+			return fmt.Errorf("DB Error")
+		}
+
+		req, _ := http.NewRequest("DELETE", "/api/rooms/room123", nil)
+		// Inject admin user
+		ctx := context.WithValue(req.Context(), userIDKey, "admin-user")
+		ctx = context.WithValue(ctx, isAdminKey, true)
+		req = req.WithContext(ctx)
+
+		// Create chi context with URL param
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("roomID", "room123")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rr := httptest.NewRecorder()
+		server.deleteRoomHandler(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
 }
 
@@ -120,5 +143,29 @@ func TestRenameRoomHandler(t *testing.T) {
 		server.renameRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
+	})
+
+	t.Run("Internal Error", func(t *testing.T) {
+		mockDB.RenameRoomFn = func(ctx context.Context, id, name string) error {
+			return fmt.Errorf("DB Error")
+		}
+
+		body, _ := json.Marshal(map[string]string{"name": "New Name"})
+		req, _ := http.NewRequest("PUT", "/api/rooms/room123", bytes.NewBuffer(body))
+
+		// Inject admin user
+		ctx := context.WithValue(req.Context(), userIDKey, "admin-user")
+		ctx = context.WithValue(ctx, isAdminKey, true)
+		req = req.WithContext(ctx)
+
+		// Create chi context with URL param
+		rctx := chi.NewRouteContext()
+		rctx.URLParams.Add("roomID", "room123")
+		req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+		rr := httptest.NewRecorder()
+		server.renameRoomHandler(rr, req)
+
+		assert.Equal(t, http.StatusInternalServerError, rr.Code)
 	})
 }

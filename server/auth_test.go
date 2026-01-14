@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -156,6 +157,108 @@ func TestAuthHandlers(t *testing.T) {
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected 200, got %d, body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Login - Bad Request", func(t *testing.T) {
+		reqBody := LoginRequest{Username: "", Password: ""}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Login - Unauthorized", func(t *testing.T) {
+		mockDB.AuthenticateUserFn = func(ctx context.Context, username, password string) (string, bool, error) {
+			return "", false, fmt.Errorf("Invalid credentials")
+		}
+
+		reqBody := LoginRequest{Username: "wrong", Password: "wrong"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+
+	t.Run("Create User - Bad Request", func(t *testing.T) {
+		adminToken, _ := GenerateToken("admin-id", true)
+		reqBody := CreateUserReq{Username: "", Password: ""}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Create User - Internal Error", func(t *testing.T) {
+		adminToken, _ := GenerateToken("admin-id", true)
+		mockDB.CreateUserFn = func(ctx context.Context, user CreateUserReq) (string, error) {
+			return "", fmt.Errorf("DB Error")
+		}
+
+		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", w.Code)
+		}
+	})
+
+	t.Run("Change Password - Bad Request", func(t *testing.T) {
+		userToken, _ := GenerateToken("user-id", false)
+		reqBody := ChangePasswordReq{OldPassword: "", NewPassword: ""} // Missing passwords
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/change-password", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+userToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Change Password - Internal Error", func(t *testing.T) {
+		userToken, _ := GenerateToken("user-id", false)
+		mockDB.VerifyPasswordFn = func(ctx context.Context, userID, password string) error {
+			return nil
+		}
+		mockDB.UpdatePasswordFn = func(ctx context.Context, userID, newPassword string) error {
+			return fmt.Errorf("DB Error")
+		}
+
+		reqBody := ChangePasswordReq{OldPassword: "old", NewPassword: "new"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/change-password", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+userToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", w.Code)
 		}
 	})
 }
