@@ -106,12 +106,12 @@ func (s *Server) routes() {
 
 	s.router.Get("/health", s.healthCheckHandler)
 	s.router.Post("/api/login", s.loginHandler)
+	s.router.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(JWTMiddleware)
 		r.Post("/api/sync", s.syncHandler)
 		r.Post("/api/me", s.updateProfileHandler)
-		r.Get("/api/rooms/{roomID}/members", s.getRoomMembersHandler)
 		r.Post("/api/users", s.createUserHandler)
 		r.Post("/api/change-password", s.changePasswordHandler)
 		r.Delete("/api/rooms/{roomID}", s.deleteRoomHandler)
