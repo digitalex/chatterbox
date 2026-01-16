@@ -56,8 +56,6 @@ func TestAuthHandlers(t *testing.T) {
 		if resp.Token == "" {
 			t.Error("Expected token")
 		}
-		// Verify strict JSON structure if possible, but map check is usually better for extra fields.
-		// For now, ensuring Token exists is good.
 	})
 
 	t.Run("Create User - Admin", func(t *testing.T) {
