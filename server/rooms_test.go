@@ -39,6 +39,14 @@ func TestDeleteRoomHandler(t *testing.T) {
 		server.deleteRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var resp map[string]string
+		if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if resp["status"] != "ok" {
+			t.Errorf("Expected status 'ok', got %v", resp["status"])
+		}
 	})
 
 	t.Run("Forbidden", func(t *testing.T) {
@@ -86,6 +94,14 @@ func TestRenameRoomHandler(t *testing.T) {
 		server.renameRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+
+		var resp map[string]string
+		if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if resp["status"] != "ok" {
+			t.Errorf("Expected status 'ok', got %v", resp["status"])
+		}
 	})
 
 	t.Run("Forbidden", func(t *testing.T) {
