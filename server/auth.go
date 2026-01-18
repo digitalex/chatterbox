@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
@@ -125,6 +127,15 @@ func (s *Server) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	userID, isAdmin, err := s.db.AuthenticateUser(r.Context(), req.Username, req.Password)
 	if err != nil {
+		if status.Code(err) == codes.Unauthenticated || status.Code(err) == codes.NotFound {
+			http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	if userID == "" {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
@@ -151,8 +162,8 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+	if req.Username == "" || req.Password == "" || req.DisplayName == "" {
+		http.Error(w, "Username, Password, and Display Name are required", http.StatusBadRequest)
 		return
 	}
 
