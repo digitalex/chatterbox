@@ -4,9 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestAuthHandlers(t *testing.T) {
@@ -38,6 +42,13 @@ func TestAuthHandlers(t *testing.T) {
 	server := NewServer(mockDB, nil)
 
 	t.Run("Login Success", func(t *testing.T) {
+		mockDB.AuthenticateUserFn = func(ctx context.Context, username, password string) (string, bool, error) {
+			if username == "admin" && password == "adminpass" {
+				return "admin-id", true, nil
+			}
+			return "", false, status.Error(codes.Unauthenticated, "invalid credentials")
+		}
+
 		reqBody := LoginRequest{Username: "admin", Password: "adminpass"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
@@ -60,7 +71,58 @@ func TestAuthHandlers(t *testing.T) {
 		// For now, ensuring Token exists is good.
 	})
 
+	t.Run("Login Failure", func(t *testing.T) {
+		mockDB.AuthenticateUserFn = func(ctx context.Context, username, password string) (string, bool, error) {
+			return "", false, status.Error(codes.Unauthenticated, "invalid credentials")
+		}
+
+		reqBody := LoginRequest{Username: "user", Password: "wrongpassword"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	t.Run("Login Bad Request", func(t *testing.T) {
+		reqBody := map[string]string{"username": "user"} // Missing password
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Login Internal Error", func(t *testing.T) {
+		mockDB.AuthenticateUserFn = func(ctx context.Context, username, password string) (string, bool, error) {
+			return "", false, fmt.Errorf("DB error")
+		}
+
+		reqBody := LoginRequest{Username: "user", Password: "password"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", w.Code)
+		}
+	})
+
 	t.Run("Create User - Admin", func(t *testing.T) {
+		// Restore default mock behavior
+		mockDB.CreateUserFn = func(ctx context.Context, user CreateUserReq) (string, error) {
+			return "new-user-id", nil
+		}
 		// Generate Admin Token
 		adminToken, _ := GenerateToken("admin-id", true)
 
@@ -82,6 +144,39 @@ func TestAuthHandlers(t *testing.T) {
 		}
 		if resp["user_id"] != "new-user-id" {
 			t.Errorf("Expected user_id 'new-user-id', got %v", resp["user_id"])
+		}
+	})
+
+	t.Run("Create User Bad Request", func(t *testing.T) {
+		adminToken, _ := GenerateToken("admin-id", true)
+		reqBody := map[string]string{"username": "newuser"} // Missing password
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Create User Internal Error", func(t *testing.T) {
+		mockDB.CreateUserFn = func(ctx context.Context, user CreateUserReq) (string, error) {
+			return "", fmt.Errorf("DB error")
+		}
+		adminToken, _ := GenerateToken("admin-id", true)
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusInternalServerError {
+			t.Errorf("Expected 500, got %d", w.Code)
 		}
 	})
 
