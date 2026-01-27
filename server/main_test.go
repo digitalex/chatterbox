@@ -272,6 +272,47 @@ func TestHealthCheckError(t *testing.T) {
 	}
 }
 
+func TestSyncBadRequest(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+	token, _ := GenerateToken("test-user", false)
+
+	tests := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "Invalid Room - Missing Name",
+			body: `{"rooms": [{"room_id": "r1", "name": ""}]}`,
+		},
+		{
+			name: "Invalid Room - Missing RoomID",
+			body: `{"rooms": [{"room_id": "", "name": "Room"}]}`,
+		},
+		{
+			name: "Invalid Message - Missing RoomID",
+			body: `{"messages": [{"room_id": "", "message_id": 1}]}`,
+		},
+		{
+			name: "Invalid Message - Missing MessageID",
+			body: `{"messages": [{"room_id": "r1", "message_id": 0}]}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(tc.body))
+			req.Header.Set("Authorization", "Bearer "+token)
+			rr := httptest.NewRecorder()
+			srv.router.ServeHTTP(rr, req)
+
+			if status := rr.Code; status != http.StatusBadRequest {
+				t.Errorf("%s: handler returned wrong status code: got %v want %v",
+					tc.name, status, http.StatusBadRequest)
+			}
+		})
+	}
+}
+
 func TestSyncError(t *testing.T) {
 	mockDB := &MockDB{
 		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
