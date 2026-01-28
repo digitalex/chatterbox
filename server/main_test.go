@@ -204,8 +204,7 @@ func TestGetRoomMembers(t *testing.T) {
 	srv := NewServer(mockDB, nil)
 
 	req, _ := http.NewRequest("GET", "/api/rooms/room-1/members", nil)
-	token, _ := GenerateToken("u1", false)
-	req.Header.Set("Authorization", "Bearer "+token)
+	// No auth required
 	rr := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(rr, req)
@@ -318,8 +317,7 @@ func TestGetRoomMembersError(t *testing.T) {
 	}
 	srv := NewServer(mockDB, nil)
 	req, _ := http.NewRequest("GET", "/api/rooms/r1/members", nil)
-	token, _ := GenerateToken("test-user", false)
-	req.Header.Set("Authorization", "Bearer "+token)
+	// No auth required
 	rr := httptest.NewRecorder()
 	srv.router.ServeHTTP(rr, req)
 
