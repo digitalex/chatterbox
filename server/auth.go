@@ -156,6 +156,11 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.DisplayName == "" {
+		http.Error(w, "Display name is required", http.StatusBadRequest)
+		return
+	}
+
 	userID, err := s.db.CreateUser(r.Context(), req)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create user: %v", err), http.StatusInternalServerError)
