@@ -19,7 +19,7 @@ func TestAuthHandlers(t *testing.T) {
 			if username == "user" && password == "userpass" {
 				return "user-id", false, nil
 			}
-			return "", false, nil // Error?
+			return "", false, http.ErrNoCookie // Just an error to trigger failure
 		},
 		CreateUserFn: func(ctx context.Context, user CreateUserReq) (string, error) {
 			return "new-user-id", nil
@@ -64,7 +64,7 @@ func TestAuthHandlers(t *testing.T) {
 		// Generate Admin Token
 		adminToken, _ := GenerateToken("admin-id", true)
 
-		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+adminToken)
@@ -156,6 +156,64 @@ func TestAuthHandlers(t *testing.T) {
 
 		if w.Code != http.StatusOK {
 			t.Errorf("Expected 200, got %d, body: %s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("Create User - Missing Display Name", func(t *testing.T) {
+		adminToken, _ := GenerateToken("admin-id", true)
+
+		reqBody := CreateUserReq{Username: "newuser", Password: "password"} // Missing DisplayName
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Login - Missing Fields", func(t *testing.T) {
+		reqBody := LoginRequest{Username: "user"} // Missing Password
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("Login - Invalid Credentials", func(t *testing.T) {
+		reqBody := LoginRequest{Username: "user", Password: "wrongpassword"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/login", bytes.NewBuffer(body))
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusUnauthorized {
+			t.Errorf("Expected 401, got %d", w.Code)
+		}
+	})
+
+	t.Run("Change Password - Missing Fields", func(t *testing.T) {
+		userToken, _ := GenerateToken("user-id", false)
+
+		reqBody := ChangePasswordReq{OldPassword: "oldpassword"} // Missing NewPassword
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/change-password", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+userToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
 		}
 	})
 }

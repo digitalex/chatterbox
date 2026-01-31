@@ -149,6 +149,20 @@ func TestSyncUnauthorized(t *testing.T) {
 	}
 }
 
+func TestSyncMalformedJSON(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{"last_synced_at":`)) // Broken JSON
+	token, _ := GenerateToken("test-user", false)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
+	}
+}
+
 func TestUpdateProfile(t *testing.T) {
 	mockDB := &MockDB{
 		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
