@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"time"
 
@@ -55,8 +56,9 @@ func (s *Server) syncHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Parse Request Body
 	var req SyncRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		// If body is empty, assume clean sync (req is zero-valued)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
 	}
 
 	// Default to "beginning of time" if no timestamp provided
