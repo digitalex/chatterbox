@@ -151,8 +151,8 @@ func (s *Server) createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		http.Error(w, "Username and Password are required", http.StatusBadRequest)
+	if req.Username == "" || req.Password == "" || req.DisplayName == "" {
+		http.Error(w, "Username, Password, and Display Name are required", http.StatusBadRequest)
 		return
 	}
 
