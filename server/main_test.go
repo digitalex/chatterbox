@@ -204,8 +204,7 @@ func TestGetRoomMembers(t *testing.T) {
 	srv := NewServer(mockDB, nil)
 
 	req, _ := http.NewRequest("GET", "/api/rooms/room-1/members", nil)
-	token, _ := GenerateToken("u1", false)
-	req.Header.Set("Authorization", "Bearer "+token)
+	// Public endpoint, no auth needed
 	rr := httptest.NewRecorder()
 
 	srv.router.ServeHTTP(rr, req)
@@ -269,6 +268,20 @@ func TestHealthCheckError(t *testing.T) {
 	if status := rr.Code; status != http.StatusInternalServerError {
 		t.Errorf("handler returned wrong status code: got %v want %v",
 			status, http.StatusInternalServerError)
+	}
+}
+
+func TestSyncMalformedJSON(t *testing.T) {
+	srv := NewServer(&MockDB{}, nil)
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(`{"last_synced_at":`)) // Invalid JSON
+	token, _ := GenerateToken("test-user", false)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusBadRequest)
 	}
 }
 

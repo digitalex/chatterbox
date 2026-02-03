@@ -64,7 +64,7 @@ func TestAuthHandlers(t *testing.T) {
 		// Generate Admin Token
 		adminToken, _ := GenerateToken("admin-id", true)
 
-		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+adminToken)
@@ -85,11 +85,28 @@ func TestAuthHandlers(t *testing.T) {
 		}
 	})
 
+	t.Run("Create User - Missing DisplayName", func(t *testing.T) {
+		// Generate Admin Token
+		adminToken, _ := GenerateToken("admin-id", true)
+
+		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		body, _ := json.Marshal(reqBody)
+		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400, got %d", w.Code)
+		}
+	})
+
 	t.Run("Create User - NonAdmin", func(t *testing.T) {
 		// Generate User Token
 		userToken, _ := GenerateToken("user-id", false)
 
-		reqBody := CreateUserReq{Username: "newuser", Password: "password"}
+		reqBody := CreateUserReq{Username: "newuser", Password: "password", DisplayName: "New User"}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/api/users", bytes.NewBuffer(body))
 		req.Header.Set("Authorization", "Bearer "+userToken)
