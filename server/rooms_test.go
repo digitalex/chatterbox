@@ -39,6 +39,7 @@ func TestDeleteRoomHandler(t *testing.T) {
 		server.deleteRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.JSONEq(t, `{"status":"ok"}`, rr.Body.String())
 	})
 
 	t.Run("Forbidden", func(t *testing.T) {
@@ -86,6 +87,7 @@ func TestRenameRoomHandler(t *testing.T) {
 		server.renameRoomHandler(rr, req)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.JSONEq(t, `{"status":"ok"}`, rr.Body.String())
 	})
 
 	t.Run("Forbidden", func(t *testing.T) {
