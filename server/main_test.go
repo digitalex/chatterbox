@@ -106,6 +106,32 @@ func TestSync(t *testing.T) {
 	}
 }
 
+func TestSyncFirstLoad(t *testing.T) {
+	mockDB := &MockDB{
+		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
+			if !lastSync.IsZero() {
+				t.Errorf("Expected zero time for first load, got %v", lastSync)
+			}
+			return []*RoomResult{}, []*MsgResult{}, []*UserResult{}, nil
+		},
+	}
+	srv := NewServer(mockDB, nil)
+
+	// last_synced_at is null
+	reqBody := `{"last_synced_at": null}`
+	req, _ := http.NewRequest("POST", "/api/sync", strings.NewReader(reqBody))
+	token, _ := GenerateToken("test-user", false)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := httptest.NewRecorder()
+
+	srv.router.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+}
+
 func TestSyncUpstream(t *testing.T) {
 	mockDB := &MockDB{
 		SyncFn: func(ctx context.Context, userID string, lastSync time.Time, rooms []RoomReq, messages []MsgReq) ([]*RoomResult, []*MsgResult, []*UserResult, error) {
