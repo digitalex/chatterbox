@@ -34,6 +34,7 @@ Before you begin, ensure you have the following installed:
     -   Enable the **Spanner API**.
     -   Create a Spanner Instance named `chatterbox-db`.
     -   Create a Database within that instance.
+    -   Apply the schema found in `server/spanner-schema.sql` to your database.
 
 ## Installation & Setup
 
@@ -60,6 +61,10 @@ The server is responsible for syncing messages and rooms. It connects to Google 
     ```bash
     export JWT_SECRET=your-secure-secret
     export PORT=8080
+    ```
+    *(Optional) Set a JWT secret (for production):*
+    ```bash
+    export JWT_SECRET=your-secret-key
     ```
 
 4.  Run the server:
