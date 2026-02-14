@@ -151,7 +151,7 @@ func TestSyncUnauthorized(t *testing.T) {
 
 func TestUpdateProfile(t *testing.T) {
 	mockDB := &MockDB{
-		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
+		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string) error {
 			if displayName == nil || *displayName != "New Name" {
 				t.Errorf("Expected DisplayName 'New Name', got %v", displayName)
 			}
@@ -160,7 +160,7 @@ func TestUpdateProfile(t *testing.T) {
 	}
 	srv := NewServer(mockDB, nil)
 
-	reqBody := `{"display_name": "New Name", "public_key": "key123"}`
+	reqBody := `{"display_name": "New Name"}`
 	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(reqBody))
 	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -198,7 +198,7 @@ func TestGetRoomMembers(t *testing.T) {
 			if roomID != "room-1" {
 				t.Errorf("Expected roomID 'room-1', got %s", roomID)
 			}
-			return []*RoomMember{{UserID: "u1", PublicKey: "key1"}}, nil
+			return []*RoomMember{{UserID: "u1"}}, nil
 		},
 	}
 	srv := NewServer(mockDB, nil)
@@ -293,12 +293,12 @@ func TestSyncError(t *testing.T) {
 
 func TestUpdateProfileError(t *testing.T) {
 	mockDB := &MockDB{
-		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string, publicKey *string) error {
+		UpdateProfileFn: func(ctx context.Context, userID string, displayName *string) error {
 			return fmt.Errorf("DB error")
 		},
 	}
 	srv := NewServer(mockDB, nil)
-	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "error", "public_key": "error"}`))
+	req, _ := http.NewRequest("POST", "/api/me", strings.NewReader(`{"display_name": "error"}`))
 	token, _ := GenerateToken("test-user", false)
 	req.Header.Set("Authorization", "Bearer "+token)
 	rr := httptest.NewRecorder()

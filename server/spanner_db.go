@@ -154,7 +154,7 @@ func (db *SpannerDB) HealthCheck(ctx context.Context) (int64, error) {
 	return val, nil
 }
 
-func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayName *string, publicKey *string) error {
+func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayName *string) error {
 	var cols []string
 	var vals []interface{}
 
@@ -164,11 +164,6 @@ func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayNa
 	if displayName != nil {
 		cols = append(cols, "DisplayName")
 		vals = append(vals, *displayName)
-	}
-
-	if publicKey != nil {
-		cols = append(cols, "PublicKey")
-		vals = append(vals, *publicKey)
 	}
 
 	if len(cols) == 1 {
@@ -184,7 +179,7 @@ func (db *SpannerDB) UpdateProfile(ctx context.Context, userID string, displayNa
 
 func (db *SpannerDB) GetRoomMembers(ctx context.Context, roomID string) ([]*RoomMember, error) {
 	stmt := spanner.Statement{
-		SQL: `SELECT u.UserId, u.PublicKey
+		SQL: `SELECT u.UserId
               FROM RoomMembers rm
               JOIN Users u ON rm.UserId = u.UserId
               WHERE rm.RoomId = @rid`,
@@ -203,11 +198,9 @@ func (db *SpannerDB) GetRoomMembers(ctx context.Context, roomID string) ([]*Room
 			return nil, err
 		}
 		var m RoomMember
-		var pk spanner.NullString
-		if err := row.Columns(&m.UserID, &pk); err != nil {
+		if err := row.Columns(&m.UserID); err != nil {
 			return nil, err
 		}
-		m.PublicKey = pk.StringVal
 		members = append(members, &m)
 	}
 	return members, nil

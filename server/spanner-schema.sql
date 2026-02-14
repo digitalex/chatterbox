@@ -44,7 +44,6 @@ CREATE TABLE RoomMembers (
 CREATE TABLE Users (
   UserId STRING(36) NOT NULL,
   Email STRING(255),
-  PublicKey STRING(MAX),
   CreatedAt TIMESTAMP NOT NULL OPTIONS (
     allow_commit_timestamp = true
   ),
