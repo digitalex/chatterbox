@@ -253,6 +253,11 @@
       "get": {
         "summary": "Get Room Members",
         "description": "Retrieves the list of members in a specific room.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "roomID",
