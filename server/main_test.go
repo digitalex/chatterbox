@@ -104,6 +104,10 @@ func TestSync(t *testing.T) {
 	if len(resp.Users) != 1 || resp.Users[0].UserID != "u1" {
 		t.Errorf("Unexpected users response")
 	}
+
+	if resp.SyncTimestamp.IsZero() {
+		t.Errorf("Expected sync_timestamp in response")
+	}
 }
 
 func TestSyncUpstream(t *testing.T) {
